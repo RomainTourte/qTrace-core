@@ -429,7 +429,9 @@ public class QTraceExporter {
                 if (nPts > 0) d.addProperty("num_points", nPts);
                 // For lines: explicit start/end; for point annotations: full coordinate list
                 String roiName = roi.getRoiName();
-                if ("Line".equals(roiName) || "Points".equals(roiName) || "Polygon".equals(roiName) || "Polyline".equals(roiName)) {
+                if ("Line".equals(roiName) || "Points".equals(roiName)
+                 || "Polygon".equals(roiName) || "Polyline".equals(roiName)
+                 || "Geometry".equals(roiName)) {
                     var pts = roi.getAllPoints();
                     JsonArray ptsArr = new JsonArray();
                     for (var p : pts) {
