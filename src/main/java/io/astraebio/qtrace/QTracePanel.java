@@ -70,7 +70,7 @@ public class QTracePanel {
         this.stage = new Stage();
         stage.initOwner(qupath.getStage());
         stage.initModality(Modality.NONE);
-        stage.setTitle("QTrace  v" + QTraceController.VERSION);
+        stage.setTitle(QTraceController.getEditionLabel());
         stage.setResizable(true);
         stage.setMinWidth(280);
         stage.setMinHeight(380);
@@ -114,7 +114,8 @@ public class QTracePanel {
 
         ImageView logoView = logoView(28);
 
-        Text title = new Text("QTrace");
+        String edition = QTracePluginManager.hasEnterprise() ? "Enterprise" : "Core";
+        Text title = new Text("qTrace " + edition);
         title.setFont(Font.font("System", FontWeight.BOLD, 18));
         title.setFill(Color.web(TEXT_MAIN));
 

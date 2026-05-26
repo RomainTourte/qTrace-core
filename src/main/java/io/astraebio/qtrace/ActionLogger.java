@@ -134,6 +134,23 @@ public class ActionLogger implements WorkflowListener {
             }
             if (!knownClassifiers.isEmpty()) checkTrainingIntegrity(changed);
         }
+
+        // Annotation geometry modified (vertex moved, reshaped) or class reassigned
+        if ((type == PathObjectHierarchyEvent.HierarchyEventType.CHANGE_OTHER
+          || type == PathObjectHierarchyEvent.HierarchyEventType.CHANGE_CLASSIFICATION)
+          && !scriptRunning) {
+            for (PathObject obj : changed) {
+                if (!obj.isAnnotation()) continue;
+                UUID uuid = obj.getID();
+                if (annotationStepIndex.containsKey(uuid)) {
+                    refreshAnnotationCapture(obj);
+                } else if (snapshotAnnotationIds.contains(uuid)) {
+                    // Pre-existing annotation modified for the first time — start tracking it
+                    snapshotAnnotationIds.remove(uuid);
+                    captureManualAnnotation(obj);
+                }
+            }
+        }
     };
 
     public ActionLogger(QuPathGUI qupath, QTracePanel panel) {

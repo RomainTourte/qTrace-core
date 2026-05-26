@@ -49,7 +49,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class QTraceController {
 
-    static final String VERSION = "0.6.7";
+    static final String VERSION = "1.0.0";
+
+    public static String getEditionLabel() {
+        String edition = QTracePluginManager.hasEnterprise() ? "Enterprise" : "Core";
+        return "qTrace " + edition + "  v" + VERSION;
+    }
 
     private final QuPathGUI qupath;
     private QTracePanel     panel;
@@ -100,7 +105,7 @@ public class QTraceController {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.initOwner(qupath.getStage());
         alert.setTitle("About QTrace");
-        alert.setHeaderText("QTrace  v" + VERSION);
+        alert.setHeaderText(getEditionLabel());
         javafx.scene.image.Image logo = QTracePanel.loadLogo();
         if (logo != null) {
             javafx.scene.image.ImageView iv = new javafx.scene.image.ImageView(logo);
@@ -388,9 +393,7 @@ public class QTraceController {
             return;
         }
 
-        var p = QTracePluginManager.get();
-        if (p == null) { showEnterpriseAlert("Validate & Stamp"); return; }
-        p.showValidationDialog(qupath.getStage(), lastGitHash, logger.getImageHash(),
+        ValidationStamper.show(qupath.getStage(), lastGitHash, logger.getImageHash(),
                                logger.computeClassifierFidelity())
             .ifPresentOrElse(
                 stamp -> {
