@@ -1736,6 +1736,8 @@ public class QTraceDashboard {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    public void show() { stage.show(); stage.toFront(); }
-    public boolean isShowing() { return stage.isShowing(); }
+    public void show()       { stage.show(); stage.toFront(); stage.setIconified(false); }
+    public void minimize()   { stage.setIconified(true); }
+    public boolean isShowing()    { return stage.isShowing(); }
+    public boolean isIconified()  { return stage.isIconified(); }
 }

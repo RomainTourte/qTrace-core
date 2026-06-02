@@ -89,9 +89,14 @@ public class QTraceController {
     }
 
     public void showDashboard() {
-        if (dashboard == null || !dashboard.isShowing())
+        if (dashboard == null || !dashboard.isShowing()) {
             dashboard = new QTraceDashboard(qupath);
-        dashboard.show();
+            dashboard.show();
+        } else if (dashboard.isIconified()) {
+            dashboard.show();
+        } else {
+            dashboard.minimize();
+        }
     }
 
     public void showPreferences() {
