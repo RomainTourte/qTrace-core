@@ -75,7 +75,7 @@ public class QTraceDashboard {
     private final Label[] sortIndicators = new Label[COL_NAMES.length];
 
     // ── Row data model ────────────────────────────────────────────────────────
-    private record RowData(String imageName, JsonObject qtrace) {}
+    private record RowData(String imageName, JsonObject qtrace, File qtraceFile) {}
 
     // ── State ─────────────────────────────────────────────────────────────────
     private final QuPathGUI     qupath;
@@ -84,8 +84,9 @@ public class QTraceDashboard {
     private final List<RowData> filteredRows = new ArrayList<>();
     private final VBox          tableRows;
     private final Label         scanPathLabel;
-    private HBox    selectedRow;
-    private boolean sortAsc     = true;
+    private HBox     selectedRow;
+    private RowData  selectedData;
+    private boolean  sortAsc     = true;
     private int     sortColIdx  = 0;
     private String  filterText  = "";
 
@@ -369,6 +370,7 @@ public class QTraceDashboard {
         try { qtDir = QTraceConfig.get().getExportDir().toFile(); } catch (Exception ignored) {}
 
         Map<String, JsonObject> qtraceMap = new LinkedHashMap<>();
+        Map<String, File>       fileMap   = new LinkedHashMap<>();
         if (qtDir != null && qtDir.exists() && qtDir.isDirectory()) {
             File[] files = qtDir.listFiles((d, n) -> n.endsWith(".qtrace"));
             if (files != null) {
@@ -383,6 +385,7 @@ public class QTraceDashboard {
                             ? str(img, "name", f.getName().replace(".qtrace", ""))
                             : f.getName().replace(".qtrace", "");
                         qtraceMap.put(imgName, root);
+                        fileMap.put(imgName, f);
                     } catch (Exception ignored) {}
                 }
             }
@@ -395,14 +398,15 @@ public class QTraceDashboard {
                 for (var entry : project.getImageList()) {
                     String name = entry.getImageName();
                     added.add(name);
-                    allRows.add(new RowData(name, findMatchingQtrace(name, qtraceMap)));
+                    allRows.add(new RowData(name, findMatchingQtrace(name, qtraceMap),
+                        findMatchingFile(name, fileMap)));
                 }
             }
         } catch (Exception ignored) {}
 
         for (var e : qtraceMap.entrySet()) {
             boolean already = added.stream().anyMatch(n -> namesMatch(n, e.getKey()));
-            if (!already) allRows.add(new RowData(e.getKey(), e.getValue()));
+            if (!already) allRows.add(new RowData(e.getKey(), e.getValue(), fileMap.get(e.getKey())));
         }
 
         String dirPath = qtDir != null ? qtDir.getAbsolutePath() : "(not configured)";
@@ -411,6 +415,12 @@ public class QTraceDashboard {
     }
 
     private JsonObject findMatchingQtrace(String name, Map<String, JsonObject> map) {
+        for (var e : map.entrySet())
+            if (namesMatch(name, e.getKey())) return e.getValue();
+        return null;
+    }
+
+    private File findMatchingFile(String name, Map<String, File> map) {
         for (var e : map.entrySet())
             if (namesMatch(name, e.getKey())) return e.getValue();
         return null;
@@ -710,6 +720,7 @@ public class QTraceDashboard {
                 tryOpenImage(imageName);
             } else {
                 selectRow(row);
+                selectedData = data;
                 if (hasTrace) populate(root);
                 else clearDetail();
             }
@@ -789,6 +800,7 @@ public class QTraceDashboard {
     }
 
     private void clearDetail() {
+        selectedData = null;
         setPlaceholder(imageCardContent,         "Select an image from the table above");
         setPlaceholder(alignmentCardContent,     "");
         setPlaceholder(segmentationCardContent,  "");
@@ -797,14 +809,73 @@ public class QTraceDashboard {
         setPlaceholder(annotationsCardContent,   "");
     }
 
+    // ── Delete .qtrace ────────────────────────────────────────────────────────
+
+    private void confirmAndDeleteQtrace() {
+        if (selectedData == null || selectedData.qtraceFile() == null) return;
+        File file = selectedData.qtraceFile();
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.initOwner(stage);
+        alert.setTitle("Delete .qtrace file");
+        alert.setHeaderText("Permanently delete this provenance file?");
+        alert.setContentText(
+            "File: " + file.getName() + "\n\n" +
+            "This will permanently remove the .qtrace provenance record for:\n" +
+            "  " + selectedData.imageName() + "\n\n" +
+            "This action cannot be undone.");
+
+        ButtonType deleteType = new ButtonType("Delete", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelType = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        alert.getButtonTypes().setAll(deleteType, cancelType);
+
+        // Style the Delete button red
+        alert.getDialogPane().lookupButton(deleteType)
+            .setStyle("-fx-background-color:#c0392b;-fx-text-fill:white;");
+
+        alert.showAndWait().ifPresent(result -> {
+            if (result == deleteType) {
+                try {
+                    java.nio.file.Files.deleteIfExists(file.toPath());
+                } catch (Exception ex) {
+                    new Alert(Alert.AlertType.ERROR,
+                        "Could not delete file:\n" + ex.getMessage()).showAndWait();
+                    return;
+                }
+                autoScan();
+            }
+        });
+    }
+
     // ── Card 1 — Image + Validation ───────────────────────────────────────────
 
     private void buildImageCard(JsonObject root, JsonObject img) {
         imageCardContent.getChildren().clear();
 
         if (img != null) {
-            imageCardContent.getChildren().add(
-                lbl("🖼  " + str(img, "name", "(inconnu)"), TEXT_MAIN, 13, FontWeight.BOLD, false));
+            Label nameLabel = lbl("🖼  " + str(img, "name", "(inconnu)"), TEXT_MAIN, 13, FontWeight.BOLD, false);
+            Button deleteBtn = new Button("🗑 Delete .qtrace");
+            deleteBtn.setStyle(
+                "-fx-background-color:transparent;-fx-text-fill:#e05252;" +
+                "-fx-cursor:hand;-fx-font-size:11;-fx-padding:2 8 2 8;" +
+                "-fx-border-color:#e05252;-fx-border-radius:4;-fx-background-radius:4;");
+            deleteBtn.setTooltip(new Tooltip("Permanently delete this .qtrace file"));
+            deleteBtn.setOnMouseEntered(ev -> deleteBtn.setStyle(
+                "-fx-background-color:#3a2020;-fx-text-fill:#e05252;" +
+                "-fx-cursor:hand;-fx-font-size:11;-fx-padding:2 8 2 8;" +
+                "-fx-border-color:#e05252;-fx-border-radius:4;-fx-background-radius:4;"));
+            deleteBtn.setOnMouseExited(ev -> deleteBtn.setStyle(
+                "-fx-background-color:transparent;-fx-text-fill:#e05252;" +
+                "-fx-cursor:hand;-fx-font-size:11;-fx-padding:2 8 2 8;" +
+                "-fx-border-color:#e05252;-fx-border-radius:4;-fx-background-radius:4;"));
+            deleteBtn.setOnAction(ev -> confirmAndDeleteQtrace());
+
+            Region sp = new Region();
+            HBox.setHgrow(sp, Priority.ALWAYS);
+            HBox titleRow = new HBox(6, nameLabel, sp, deleteBtn);
+            titleRow.setAlignment(Pos.CENTER_LEFT);
+            imageCardContent.getChildren().add(titleRow);
+
             String sha = str(img, "sha256", "");
             String shaShort = sha.length() >= 16 ? sha.substring(0, 16) + "…" : sha;
             int w  = img.has("width")    ? img.get("width").getAsInt()    : 0;
