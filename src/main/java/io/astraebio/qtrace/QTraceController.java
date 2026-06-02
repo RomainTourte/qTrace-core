@@ -363,8 +363,9 @@ public class QTraceController {
             return;
         }
 
+        String currentStatus = readCurrentStatus();
         ValidationStamper.show(qupath.getStage(), lastGitHash, logger.getImageHash(),
-                               logger.computeClassifierFidelity())
+                               logger.computeClassifierFidelity(), currentStatus)
             .ifPresentOrElse(
                 stamp -> {
                     lastStamp = stamp;
@@ -381,6 +382,19 @@ public class QTraceController {
                 },
                 () -> { if (panel != null) panel.log("Validation cancelled."); }
             );
+    }
+
+    private String readCurrentStatus() {
+        try {
+            var imageData = logger.getCurrentImageData();
+            if (imageData == null) return null;
+            String imageName = imageData.getServer().getMetadata().getName();
+            String base = imageName.replaceAll("[^a-zA-Z0-9._-]", "_");
+            java.nio.file.Path outFile = QTraceConfig.get().getExportDir().resolve(base + ".qtrace");
+            if (!java.nio.file.Files.exists(outFile)) return null;
+            JsonObject root = JsonParser.parseString(java.nio.file.Files.readString(outFile)).getAsJsonObject();
+            return root.has("status") ? root.get("status").getAsString() : null;
+        } catch (Exception ignored) { return null; }
     }
 
     public void exportReport() {
@@ -805,7 +819,7 @@ public class QTraceController {
 
         lastStamp = new ValidationStamp(
             validator, java.time.Instant.now(), scope, confidence, notes,
-            lastGitHash, hash, logger.computeClassifierFidelity().name());
+            lastGitHash, hash, logger.computeClassifierFidelity().name(), 1, "1-In Progress");
 
         Path exportDir = QTraceConfig.get().getExportDir();
         var  exporter  = new QTraceExporter(logger, lastGitHash, lastStamp);

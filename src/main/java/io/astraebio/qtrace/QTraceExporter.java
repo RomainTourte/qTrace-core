@@ -83,6 +83,13 @@ public class QTraceExporter {
         }
 
         root.getAsJsonArray("sessions").add(session);
+
+        // Write or preserve workflow status
+        if (stamp != null && stamp.statusLabel() != null) {
+            root.addProperty("status_index", stamp.statusIndex());
+            root.addProperty("status",       stamp.statusLabel());
+        }
+
         Files.writeString(outFile, GSON.toJson(root));
         return outFile;
     }

@@ -55,7 +55,7 @@ public class QTraceDashboard {
     );
 
     private static final String[] COL_NAMES = {
-        "Sample", "ROI", "Region", "BV (aSMA+)", "Tau", "✓ Validated",
+        "Sample", "ROI", "Status", "Region", "BV (aSMA+)", "Tau", "✓ Validated",
         "Alignment", "Segmentation", "Classifiers", "Steps"
     };
 
@@ -63,6 +63,7 @@ public class QTraceDashboard {
     private final SimpleDoubleProperty[] colWidths = {
         new SimpleDoubleProperty(70),   // Sample
         new SimpleDoubleProperty(52),   // ROI
+        new SimpleDoubleProperty(110),  // Status
         new SimpleDoubleProperty(86),   // Region
         new SimpleDoubleProperty(74),   // BV (aSMA+)
         new SimpleDoubleProperty(52),   // Tau
@@ -97,6 +98,7 @@ public class QTraceDashboard {
     private String  filterAnnotations = "all";
     private boolean filterBV          = false;
     private boolean filterTau         = false;
+    private final Set<String> filterStatus = new LinkedHashSet<>();
     private final Set<String> availProjects     = new LinkedHashSet<>();
     private final Set<String> availContributors = new LinkedHashSet<>();
     private final Set<String> availClasses      = new LinkedHashSet<>();
@@ -466,6 +468,14 @@ public class QTraceDashboard {
             if (filterBV  && !hasBvFromRow(rd))  continue;
             if (filterTau && !hasTauFromRow(rd)) continue;
 
+            // Status filter
+            if (!filterStatus.isEmpty()) {
+                String rowStatus = (rd.qtrace() != null && rd.qtrace().has("status"))
+                    ? rd.qtrace().get("status").getAsString() : null;
+                String key = rowStatus != null ? rowStatus : "none";
+                if (!filterStatus.contains(key)) continue;
+            }
+
             filteredRows.add(rd);
         }
     }
@@ -556,12 +566,17 @@ public class QTraceDashboard {
 
     private String getSortKey(RowData rd, int colIdx) {
         return switch (colIdx) {
-            case 0 -> parseSample(rd.imageName());
-            case 1 -> parseRoi(rd.imageName());
-            case 2 -> getRegionFromRow(rd);
-            case 3 -> hasBvFromRow(rd)  ? "0" : "1";
-            case 4 -> hasTauFromRow(rd) ? "0" : "1";
-            case 5 -> {
+            case 0  -> parseSample(rd.imageName());
+            case 1  -> parseRoi(rd.imageName());
+            case 2  -> {
+                JsonObject r = rd.qtrace();
+                yield (r != null && r.has("status_index"))
+                    ? String.valueOf(r.get("status_index").getAsInt()) : "9";
+            }
+            case 3  -> getRegionFromRow(rd);
+            case 4  -> hasBvFromRow(rd)  ? "0" : "1";
+            case 5  -> hasTauFromRow(rd) ? "0" : "1";
+            case 6  -> {
                 JsonObject s = latestSession(rd.qtrace());
                 if (s == null) yield "z";
                 JsonObject val = jsonObj(s, "validation");
@@ -699,17 +714,24 @@ public class QTraceDashboard {
         row.getProperties().put("bgDefault", bgDefault);
         row.setUserData(root);
 
+        // Col 2 — Status
+        String statusLabel = (root != null && root.has("status"))
+            ? root.get("status").getAsString() : null;
+        String statusText  = statusLabel != null ? statusIcon(statusLabel) + " " + statusLabel : "—";
+        String statusColor = statusLabel != null ? statusColor(statusLabel) : TEXT_MUTED;
+
         row.getChildren().addAll(
             tcell(sample,    hasTrace ? TEXT_SUB : TEXT_MUTED, 0),
             tcell(roi,       hasTrace ? TEXT_SUB : TEXT_MUTED, 1),
-            tcell(hasRegion ? region : "(unknown)", hasRegion ? TEXT_SUB : TEXT_MUTED, 2, !hasRegion),
-            tcell(bvText,    bvColor,   3),
-            tcell(tauText,   tauColor,  4),
-            tcell(valText,   valColor,  5),
-            tcell(alignText, alignColor, 6),
-            tcell(segText,   segColor,   7),
-            tcell(clfText,   clfColor,   8),
-            tcell(stepsText, TEXT_MUTED, 9)
+            tcell(statusText, statusColor, 2),
+            tcell(hasRegion ? region : "(unknown)", hasRegion ? TEXT_SUB : TEXT_MUTED, 3, !hasRegion),
+            tcell(bvText,    bvColor,    4),
+            tcell(tauText,   tauColor,   5),
+            tcell(valText,   valColor,   6),
+            tcell(alignText, alignColor,  7),
+            tcell(segText,   segColor,    8),
+            tcell(clfText,   clfColor,    9),
+            tcell(stepsText, TEXT_MUTED, 10)
         );
 
         row.setOnMouseEntered(e -> { if (row != selectedRow) row.setStyle(bgHover); });
@@ -1578,6 +1600,20 @@ public class QTraceDashboard {
         };
     }
 
+    private String statusColor(String label) {
+        if (label == null) return TEXT_MUTED;
+        if (label.startsWith("2")) return GREEN;
+        if (label.startsWith("1")) return PEACH;
+        return TEXT_MUTED;
+    }
+
+    private String statusIcon(String label) {
+        if (label == null) return "○";
+        if (label.startsWith("2")) return "✅";
+        if (label.startsWith("1")) return "⏳";
+        return "○";
+    }
+
     // ── Filter panel ──────────────────────────────────────────────────────────
 
     private VBox buildFilterPanel() {
@@ -1657,6 +1693,7 @@ public class QTraceDashboard {
             filterProjects.clear();
             filterContributors.clear();
             filterClasses.clear();
+            filterStatus.clear();
             filterAnnotations = "all";
             filterBV  = false;
             filterTau = false;
@@ -1797,7 +1834,24 @@ public class QTraceDashboard {
         cbTau.setOnAction(e -> { filterTau = cbTau.isSelected(); applyFilter(); applySort(); renderRows(); });
         bvTauBox.getChildren().addAll(cbBV, cbTau);
 
+        // Status filter
+        VBox statusBox = new VBox(4);
+        String[] statusKeys   = {"2-Finished", "1-In Progress", "0-To Begin", "none"};
+        String[] statusLabels = {"✅ 2-Finished", "⏳ 1-In Progress", "○ 0-To Begin", "○ No status"};
+        for (int i = 0; i < statusKeys.length; i++) {
+            String key   = statusKeys[i];
+            CheckBox cb  = new CheckBox(statusLabels[i]);
+            cb.setSelected(filterStatus.contains(key));
+            cb.setStyle("-fx-text-fill:" + TEXT_SUB + ";-fx-font-size:11;");
+            cb.setOnAction(e -> {
+                if (cb.isSelected()) filterStatus.add(key); else filterStatus.remove(key);
+                applyFilter(); applySort(); renderRows();
+            });
+            statusBox.getChildren().add(cb);
+        }
+
         filterCheckboxContainer.getChildren().addAll(
+            buildFilterSection("Status",             statusBox),
             buildFilterSection("BV & Tau",           bvTauBox),
             buildFilterSection("Projects",           projectsBox),
             buildFilterSection("Contributors",       contribBox),

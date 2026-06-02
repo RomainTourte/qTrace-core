@@ -14,5 +14,7 @@ public record ValidationStamp(
     String  notes,
     String  gitHash,
     String  imageHash,
-    String  classifierFidelity   // ClassifierFidelity.name() — HIGH / DEGRADED / COMPROMISED
+    String  classifierFidelity,  // ClassifierFidelity.name() — HIGH / DEGRADED / COMPROMISED
+    int     statusIndex,         // 0=To Begin, 1=In Progress, 2=Finished
+    String  statusLabel          // "0-To Begin" / "1-In Progress" / "2-Finished"
 ) {}

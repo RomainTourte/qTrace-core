@@ -29,8 +29,11 @@ public class ValidationStamper {
      * @param imgHash  SHA-256 of the source image (may be null if still computing)
      * @param fidelity classifier fidelity computed by ActionLogger
      */
+    public static final String[] STATUS_LABELS = {"0-To Begin", "1-In Progress", "2-Finished"};
+
     public static Optional<ValidationStamp> show(Stage owner, String gitHash, String imgHash,
-                                                  ClassifierFidelity fidelity) {
+                                                  ClassifierFidelity fidelity,
+                                                  String currentStatusLabel) {
         Dialog<ValidationStamp> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle("QTrace — Expert Validation");
@@ -62,6 +65,14 @@ public class ValidationStamper {
         notesArea.setPrefRowCount(3);
         notesArea.setWrapText(true);
 
+        ComboBox<String> statusBox = new ComboBox<>(
+            FXCollections.observableArrayList(STATUS_LABELS));
+        String preselect = "1-In Progress";
+        if (currentStatusLabel != null) {
+            for (String s : STATUS_LABELS) if (s.equals(currentStatusLabel)) { preselect = s; break; }
+        }
+        statusBox.setValue(preselect);
+
         // Read-only provenance display
         Label gitLabel = new Label(gitHash != null ? gitHash : "(not committed yet)");
         Label imgLabel = new Label(imgHash != null ? imgHash.substring(0, 16) + "…" : "(pending)");
@@ -89,6 +100,7 @@ public class ValidationStamper {
         grid.add(new Label("Scope"),              0, row); grid.add(scopeBox,       1, row++);
         grid.add(new Label("Confidence"),         0, row); grid.add(confidenceBox,  1, row++);
         grid.add(new Label("Notes"),              0, row); grid.add(notesArea,      1, row++);
+        grid.add(new Label("Workflow status"),    0, row); grid.add(statusBox,      1, row++);
         grid.add(new Label("Git hash"),           0, row); grid.add(gitLabel,       1, row++);
         grid.add(new Label("Image SHA-256"),      0, row); grid.add(imgLabel,       1, row++);
         grid.add(new Label("Classifier Fidelity"),0, row); grid.add(fidelityLabel,  1, row);
@@ -105,6 +117,10 @@ public class ValidationStamper {
         // ── Result converter ─────────────────────────────────────────────────
         dialog.setResultConverter(btn -> {
             if (btn != ButtonType.OK) return null;
+            String sel = statusBox.getValue();
+            int idx = 1;
+            for (int i = 0; i < STATUS_LABELS.length; i++)
+                if (STATUS_LABELS[i].equals(sel)) { idx = i; break; }
             return new ValidationStamp(
                 validatorField.getText().trim(),
                 Instant.now(),
@@ -113,7 +129,9 @@ public class ValidationStamper {
                 notesArea.getText().trim(),
                 gitHash,
                 imgHash,
-                fidelity.name()
+                fidelity.name(),
+                idx,
+                sel
             );
         });
 
