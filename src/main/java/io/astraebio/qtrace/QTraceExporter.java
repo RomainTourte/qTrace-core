@@ -464,7 +464,7 @@ public class QTraceExporter {
         annObj.add("details", details);
 
         // GeoJSON with qtrace:author injected into each feature's properties
-        String geoFile = exportAnnotationsWithAuthors(allAnnotations, outputDir, imageName);
+        String geoFile = exportAnnotationsWithAuthors(allAnnotations, QTraceConfig.get().getTrainingDir(), imageName);
         annObj.addProperty("geojson_file", geoFile != null ? geoFile : "");
 
         return annObj;
