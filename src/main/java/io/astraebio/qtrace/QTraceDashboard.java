@@ -118,7 +118,8 @@ public class QTraceDashboard {
     public QTraceDashboard(QuPathGUI qupath) {
         this.qupath = qupath;
         stage = new Stage();
-        stage.initOwner(qupath.getStage());
+        // No initOwner — owned stages have no taskbar entry on Windows, making
+        // the native minimize button non-functional (window vanishes).
         stage.initModality(Modality.NONE);
         stage.setTitle("QTrace Dashboard  v" + QTraceController.VERSION);
         javafx.scene.image.Image logo = QTracePanel.loadLogo();
