@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
 public class ActionLogger implements WorkflowListener {
 
     private final QuPathGUI qupath;
-    private final QTracePanel panel;
+    private QTracePanel panel;
 
     private final List<JsonObject> capturedSteps = new ArrayList<>();
     private int lastKnownStepCount = 0;
@@ -153,16 +153,18 @@ public class ActionLogger implements WorkflowListener {
         }
     };
 
+    public void setPanel(QTracePanel p) { this.panel = p; }
+
     public ActionLogger(QuPathGUI qupath, QTracePanel panel) {
         this.qupath = qupath;
         this.panel  = panel;
         this.warpyButtonHandler = event -> Platform.runLater(() -> {
             String btnText = (event.getSource() instanceof Button b) ? b.getText() : "?";
-            panel.log("[Alignment/Warpy] Button '" + btnText + "' clicked — capturing matrix...");
+            if (panel != null) panel.log("[Alignment/Warpy] Button '" + btnText + "' clicked — capturing matrix...");
             if (warpyHookedTextArea != null)
                 onWarpySaveClicked(warpyHookedTextArea.getText());
             else
-                panel.log("[Alignment/Warpy] WARNING: no TextArea found — matrix not captured.");
+                if (panel != null) panel.log("[Alignment/Warpy] WARNING: no TextArea found — matrix not captured.");
         });
     }
 
@@ -210,15 +212,17 @@ public class ActionLogger implements WorkflowListener {
         startAlignmentWatcher();
 
         refreshManualAnnotationCount();
-        panel.setRecordingActive(true);
-        panel.updateStepCount(capturedSteps.size(), preExistingStepCount, manualAnnotationCount);
-        panel.setGenerateReady(!capturedSteps.isEmpty());
-        panel.log("Recording started — " + serverName(imageData));
+        if (panel != null) panel.setRecordingActive(true);
+        if (panel != null) panel.updateStepCount(capturedSteps.size(), preExistingStepCount, manualAnnotationCount);
+        if (panel != null) panel.setRecordReady(!capturedSteps.isEmpty());
+        if (panel != null) panel.log("Recording started — " + serverName(imageData));
 
         computeHashAsync(imageData);
     }
 
     /** Detach and reset. */
+    public boolean isAttached() { return currentImageData != null; }
+
     public void detach() {
         stopAlignmentWatcher();
         stopWarpyFileWatcher();
@@ -243,9 +247,9 @@ public class ActionLogger implements WorkflowListener {
         snapshotAnnotationIds.clear();
         deletedFragments.clear();
 
-        panel.setRecordingActive(false);
-        panel.setGenerateReady(false);
-        panel.updateStepCount(0, 0, 0);
+        if (panel != null) panel.setRecordingActive(false);
+        if (panel != null) panel.setRecordReady(false);
+        if (panel != null) panel.updateStepCount(0, 0, 0);
     }
 
     // ── WorkflowListener ─────────────────────────────────────────────────────
@@ -260,7 +264,7 @@ public class ActionLogger implements WorkflowListener {
             WorkflowStep step = steps.get(i);
             JsonObject json   = serializeStep(step, i);
             capturedSteps.add(json);
-            panel.log("Step " + (i + 1) + " captured: " + step.getName());
+            if (panel != null) panel.log("Step " + (i + 1) + " captured: " + step.getName());
             if (step instanceof ScriptableWorkflowStep s) {
                 detectClassifierFromScript(s.getScript());
                 detectCellIntensityFromScript(s.getScript());
@@ -270,8 +274,8 @@ public class ActionLogger implements WorkflowListener {
 
         refreshManualAnnotationCount();
 
-        panel.updateStepCount(capturedSteps.size(), preExistingStepCount, manualAnnotationCount);
-        panel.setGenerateReady(!capturedSteps.isEmpty());
+        if (panel != null) panel.updateStepCount(capturedSteps.size(), preExistingStepCount, manualAnnotationCount);
+        if (panel != null) panel.setRecordReady(!capturedSteps.isEmpty());
     }
 
     // ── Serialization ────────────────────────────────────────────────────────
@@ -302,12 +306,12 @@ public class ActionLogger implements WorkflowListener {
             try {
                 var uris = imageData.getServer().getURIs();
                 if (uris.isEmpty()) {
-                    panel.log("WARNING: image has no file URI — hash skipped.");
+                    if (panel != null) panel.log("WARNING: image has no file URI — hash skipped.");
                     return;
                 }
                 File file = new File(uris.iterator().next().getPath());
                 if (!file.exists()) {
-                    panel.log("WARNING: image file not found on disk — hash skipped.");
+                    if (panel != null) panel.log("WARNING: image file not found on disk — hash skipped.");
                     return;
                 }
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -317,9 +321,9 @@ public class ActionLogger implements WorkflowListener {
                     while ((n = fis.read(buf)) != -1) digest.update(buf, 0, n);
                 }
                 imageHash = HexFormat.of().formatHex(digest.digest());
-                panel.log("SHA-256: " + imageHash.substring(0, 16) + "...");
+                if (panel != null) panel.log("SHA-256: " + imageHash.substring(0, 16) + "...");
             } catch (Exception e) {
-                panel.log("WARNING: hash error — " + e.getMessage());
+                if (panel != null) panel.log("WARNING: hash error — " + e.getMessage());
             }
         }, "qtrace-hash");
         t.setDaemon(true);
@@ -348,7 +352,7 @@ public class ActionLogger implements WorkflowListener {
 
         PathIO.exportObjectsAsGeoJSON(out, annotations);
 
-        panel.log("Annotations exported: " + annotations.size()
+        if (panel != null) panel.log("Annotations exported: " + annotations.size()
                 + " objects → " + out.getName());
         return out.getName();
     }
@@ -399,7 +403,7 @@ public class ActionLogger implements WorkflowListener {
             // workflowUpdated() fires synchronously → new entry appended to capturedSteps
             annotationStepIndex.put(uuid, capturedSteps.size() - 1);
         } catch (Exception e) {
-            panel.log("WARNING: could not capture annotation — " + e.getMessage());
+            if (panel != null) panel.log("WARNING: could not capture annotation — " + e.getMessage());
         }
     }
 
@@ -422,9 +426,9 @@ public class ActionLogger implements WorkflowListener {
             var step = new DefaultScriptableWorkflowStep("Manual annotation: " + roiName, newFrag);
             currentImageData.getHistoryWorkflow().addStep(step);
             annotationStepIndex.put(uuid, capturedSteps.size() - 1);
-            panel.log("Annotation updated: " + roiName);
+            if (panel != null) panel.log("Annotation updated: " + roiName);
         } catch (Exception e) {
-            panel.log("WARNING: annotation refresh failed — " + e.getMessage());
+            if (panel != null) panel.log("WARNING: annotation refresh failed — " + e.getMessage());
         }
     }
 
@@ -437,9 +441,9 @@ public class ActionLogger implements WorkflowListener {
         if (idx == null) return;
         retireStep(idx);
         String roiName = (obj.getROI() != null) ? obj.getROI().getRoiName() : "Object";
-        panel.log("Annotation deleted: " + roiName + " (removed from meta-script)");
+        if (panel != null) panel.log("Annotation deleted: " + roiName + " (removed from meta-script)");
         refreshManualAnnotationCount();
-        panel.updateStepCount(capturedSteps.size(), preExistingStepCount, manualAnnotationCount);
+        if (panel != null) panel.updateStepCount(capturedSteps.size(), preExistingStepCount, manualAnnotationCount);
     }
 
     // ── Retire helper ─────────────────────────────────────────────────────────
@@ -463,6 +467,7 @@ public class ActionLogger implements WorkflowListener {
     // ── Getters (consumed by Phase 3) ────────────────────────────────────────
 
     public List<JsonObject> getCapturedSteps()            { return Collections.unmodifiableList(capturedSteps); }
+    public int              getPreExistingStepCount()     { return preExistingStepCount; }
     public String           getImageHash()                { return imageHash; }
     public ImageData<BufferedImage> getCurrentImageData() { return currentImageData; }
     public int              getManualAnnotationCount()    { return manualAnnotationCount; }
@@ -506,9 +511,9 @@ public class ActionLogger implements WorkflowListener {
         // Track only steps added from this point forward
         lastKnownStepCount = currentImageData.getHistoryWorkflow().size();
 
-        panel.updateStepCount(0, 0, 0);
-        panel.setGenerateReady(false);
-        panel.log("— Reset — history cleared. Tracking from this point forward.");
+        if (panel != null) panel.updateStepCount(0, 0, 0);
+        if (panel != null) panel.setRecordReady(false);
+        if (panel != null) panel.log("— Reset — history cleared. Tracking from this point forward.");
     }
 
     public void refreshAllAnnotationCaptures() {
@@ -578,16 +583,16 @@ public class ActionLogger implements WorkflowListener {
                 movingName, movingUri,
                 refName, refUri,
                 null, null, null);
-            panel.log("[Alignment] AffineServer detected — moving: " + movingName);
-            panel.log("[Alignment] Matrix: " + Arrays.toString(matrix));
-            panel.setGenerateReady(true);
+            if (panel != null) panel.log("[Alignment] AffineServer detected — moving: " + movingName);
+            if (panel != null) panel.log("[Alignment] Matrix: " + Arrays.toString(matrix));
+            if (panel != null) panel.setRecordReady(true);
             return;
         }
 
         // ── If server changed away from AffineServer, clear that record ───────
         if (currentAlignment != null && "AffineServer".equals(currentAlignment.captureSource)) {
             currentAlignment = null;
-            panel.log("[Alignment] AffineServer transform removed.");
+            if (panel != null) panel.log("[Alignment] AffineServer transform removed.");
         }
 
         // ── Path B: try to hook the Warpy Save/Create/Update buttons ─────────
@@ -603,7 +608,7 @@ public class ActionLogger implements WorkflowListener {
                     && s.getTitle().toLowerCase().contains("warpy"));
             if (!warpyOpen) {
                 unhookWarpyPane();
-                panel.log("[Alignment/Warpy] Dialog closed — hook released.");
+                if (panel != null) panel.log("[Alignment/Warpy] Dialog closed — hook released.");
             }
         }
     }
@@ -647,7 +652,7 @@ public class ActionLogger implements WorkflowListener {
                     // Hook the Save/Create/Update buttons
                     hookButtonsInScene(stage.getScene().getRoot());
                     if (!warpyHookedButtons.isEmpty()) {
-                        panel.log("[Alignment/Warpy] Hooked " + warpyHookedButtons.size()
+                        if (panel != null) panel.log("[Alignment/Warpy] Hooked " + warpyHookedButtons.size()
                             + " button(s) — capture fires on Save/Create/Update.");
                         return;
                     }
@@ -679,7 +684,7 @@ public class ActionLogger implements WorkflowListener {
                         || lower.contains("copy")) {
                     btn.addEventHandler(ActionEvent.ACTION, warpyButtonHandler);
                     warpyHookedButtons.add(btn);
-                    panel.log("[Alignment/Warpy]   + hooked: '" + t + "'");
+                    if (panel != null) panel.log("[Alignment/Warpy]   + hooked: '" + t + "'");
                 }
             }
         }
@@ -720,8 +725,8 @@ public class ActionLogger implements WorkflowListener {
             movingName, movingUri,
             "(reference image — see QuPath project)", "",
             null, null, null);
-        panel.log("[Alignment/Warpy] Matrix captured — moving: " + movingName);
-        panel.setGenerateReady(true);
+        if (panel != null) panel.log("[Alignment/Warpy] Matrix captured — moving: " + movingName);
+        if (panel != null) panel.setRecordReady(true);
     }
 
     /** Parses the 6-value matrix text shown in the Warpy dialog.
@@ -796,7 +801,7 @@ public class ActionLogger implements WorkflowListener {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                Platform.runLater(() -> panel.log("[Warpy file watcher error] " + e.getMessage()));
+                Platform.runLater(() -> { if (panel != null) panel.log("[Warpy file watcher error] " + e.getMessage()); });
             }
         }, "qtrace-warpy-file-watcher");
         warpyFileWatcherThread.setDaemon(true);
@@ -823,7 +828,7 @@ public class ActionLogger implements WorkflowListener {
             String json = Files.readString(transformFile);
             double[] matrix = extractWarpyMatrixFromJson(json);
             if (matrix == null) {
-                panel.log("[Warpy] Could not parse matrix from " + fname);
+                if (panel != null) panel.log("[Warpy] Could not parse matrix from " + fname);
                 return;
             }
 
@@ -863,11 +868,11 @@ public class ActionLogger implements WorkflowListener {
                 sourceName, sourceUri,
                 targetName, targetUri,
                 fname, sourceId, targetId);
-            panel.log("[Alignment/Warpy] File: " + fname);
-            panel.log("  Source: " + sourceName + "  →  Target: " + targetName);
-            panel.setGenerateReady(true);
+            if (panel != null) panel.log("[Alignment/Warpy] File: " + fname);
+            if (panel != null) panel.log("  Source: " + sourceName + "  →  Target: " + targetName);
+            if (panel != null) panel.setRecordReady(true);
         } catch (Exception e) {
-            panel.log("[Warpy file parse error] " + e.getMessage());
+            if (panel != null) panel.log("[Warpy file parse error] " + e.getMessage());
         }
     }
 
@@ -949,7 +954,7 @@ public class ActionLogger implements WorkflowListener {
         cellIntensityRecords.put(measurement, new CellIntensityRecord(
             measurement, thresholds, Instant.now(),
             System.getProperty("user.name", "unknown")));
-        panel.log("[Cell intensity] '" + measurement + "' → " + Arrays.toString(thresholds));
+        if (panel != null) panel.log("[Cell intensity] '" + measurement + "' → " + Arrays.toString(thresholds));
     }
 
     // ── Classifier detection from workflow steps (PC-Load) ──────────────────
@@ -977,7 +982,7 @@ public class ActionLogger implements WorkflowListener {
             if (candidate.contains("/") || candidate.contains("\\")) continue;
             Path classifierFile = classifierDir.resolve(candidate + ".json");
             if (Files.exists(classifierFile) && !knownClassifiers.containsKey(candidate)) {
-                panel.log("[PC load] '" + candidate + "' detected in workflow step — loading.");
+                if (panel != null) panel.log("[PC load] '" + candidate + "' detected in workflow step — loading.");
                 loadClassifierFromDisk(classifierFile, candidate);
             }
         }
@@ -1012,9 +1017,9 @@ public class ActionLogger implements WorkflowListener {
             );
             knownClassifiers.put(name, record);
 
-            panel.log("[Pixel classifier loaded] " + name);
-            panel.log("  type   : " + meta.type() + " / " + meta.outputType());
-            panel.log("  sha256 : " + sha256.substring(0, 16) + "...");
+            if (panel != null) panel.log("[Pixel classifier loaded] " + name);
+            if (panel != null) panel.log("  type   : " + meta.type() + " / " + meta.outputType());
+            if (panel != null) panel.log("  sha256 : " + sha256.substring(0, 16) + "...");
 
             // Git commit + TPC JSON for provenance
             try {
@@ -1025,16 +1030,16 @@ public class ActionLogger implements WorkflowListener {
                 record.gitHash = new GitBridge(QTraceConfig.get().getClassifierDir())
                     .commit(dest, "QTrace classifier loaded: " + name
                         + " (user=" + user + ", sha=" + sha256.substring(0, 8) + ")");
-                panel.log("  git    : " + record.gitHash);
+                if (panel != null) panel.log("  git    : " + record.gitHash);
             } catch (Exception e) {
-                panel.log("  WARNING: classifier Git commit failed — " + e.getMessage());
+                if (panel != null) panel.log("  WARNING: classifier Git commit failed — " + e.getMessage());
             }
 
             writeTpcJson(record);
-            panel.setGenerateReady(true);
+            if (panel != null) panel.setRecordReady(true);
 
         } catch (Exception e) {
-            panel.log("Classifier load error: " + e.getMessage());
+            if (panel != null) panel.log("Classifier load error: " + e.getMessage());
         }
     }
 
@@ -1044,7 +1049,7 @@ public class ActionLogger implements WorkflowListener {
         if (watcherThread != null && watcherThread.isAlive()) return;
         var project = qupath.getProject();
         if (project == null || project.getPath() == null) {
-            panel.log("[PC watcher] no project open — classifier tracking disabled.");
+            if (panel != null) panel.log("[PC watcher] no project open — classifier tracking disabled.");
             return;
         }
 
@@ -1053,7 +1058,7 @@ public class ActionLogger implements WorkflowListener {
         try {
             Files.createDirectories(watchDir);
         } catch (IOException e) {
-            panel.log("[PC watcher] cannot create classifier dir: " + e.getMessage());
+            if (panel != null) panel.log("[PC watcher] cannot create classifier dir: " + e.getMessage());
             return;
         }
 
@@ -1079,12 +1084,12 @@ public class ActionLogger implements WorkflowListener {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                Platform.runLater(() -> panel.log("[PC watcher error] " + e.getMessage()));
+                Platform.runLater(() -> { if (panel != null) panel.log("[PC watcher error] " + e.getMessage()); });
             }
         }, "qtrace-classifier-watcher");
         watcherThread.setDaemon(true);
         watcherThread.start();
-        panel.log("[PC watcher] watching " + watchDir.getFileName());
+        if (panel != null) panel.log("[PC watcher] watching " + watchDir.getFileName());
     }
 
     private void stopClassifierWatcher() {
@@ -1105,7 +1110,7 @@ public class ActionLogger implements WorkflowListener {
         try {
             Files.createDirectories(watchDir);
         } catch (Exception e) {
-            panel.log("[OC watcher] cannot create dir: " + e.getMessage());
+            if (panel != null) panel.log("[OC watcher] cannot create dir: " + e.getMessage());
             return;
         }
         objClassifierWatcherThread = new Thread(() -> {
@@ -1130,7 +1135,7 @@ public class ActionLogger implements WorkflowListener {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
-                Platform.runLater(() -> panel.log("[OC watcher error] " + e.getMessage()));
+                Platform.runLater(() -> { if (panel != null) panel.log("[OC watcher error] " + e.getMessage()); });
             }
         }, "qtrace-object-classifier-watcher");
         objClassifierWatcherThread.setDaemon(true);
@@ -1162,12 +1167,12 @@ public class ActionLogger implements WorkflowListener {
         rec.addProperty("name_policy_valid", nameValid);
         knownObjectClassifiers.removeIf(o -> name.equals(o.get("name").getAsString()));
         knownObjectClassifiers.add(rec);
-        panel.log("[Object classifier saved] " + name
+        if (panel != null) panel.log("[Object classifier saved] " + name
             + (nameValid ? "" : "  ⚠ name does not match naming policy"));
 
         if (!nameValid) {
-            panel.log("  Expected : YYYYMMDD-SGI-ClassType-[...]");
-            panel.log("  Example  : 20260525-SGI-Neuron-v1");
+            if (panel != null) panel.log("  Expected : YYYYMMDD-SGI-ClassType-[...]");
+            if (panel != null) panel.log("  Example  : 20260525-SGI-Neuron-v1");
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.initOwner(qupath.getStage());
             alert.setTitle("qTrace — Classifier Name Warning");
@@ -1224,12 +1229,12 @@ public class ActionLogger implements WorkflowListener {
             knownClassifiers.put(name, record);
 
             // ── Log ─────────────────────────────────────────────────────────
-            panel.log("[Pixel classifier saved] " + name);
-            panel.log("  user      : " + user);
-            panel.log("  image SHA : " + (imageHash != null ? imageHash.substring(0,16) + "..." : "(pending)"));
-            panel.log("  type      : " + meta.type() + " / " + meta.outputType());
-            panel.log("  training  : " + training.size() + " region(s)");
-            panel.log("  sha256    : " + sha256.substring(0, 16) + "...");
+            if (panel != null) panel.log("[Pixel classifier saved] " + name);
+            if (panel != null) panel.log("  user      : " + user);
+            if (panel != null) panel.log("  image SHA : " + (imageHash != null ? imageHash.substring(0,16) + "..." : "(pending)"));
+            if (panel != null) panel.log("  type      : " + meta.type() + " / " + meta.outputType());
+            if (panel != null) panel.log("  training  : " + training.size() + " region(s)");
+            if (panel != null) panel.log("  sha256    : " + sha256.substring(0, 16) + "...");
 
             // ── Export training GeoJSON (PC-4) ───────────────────────────────
             Path trainingDir    = QTraceConfig.get().getTrainingDir();
@@ -1238,10 +1243,10 @@ public class ActionLogger implements WorkflowListener {
                 if (!training.isEmpty()) {
                     String geoFname = exportTrainingAnnotations(name, training, trainingDir);
                     record.trainingGeojsonFile = geoFname;
-                    panel.log("  training GeoJSON: " + geoFname);
+                    if (panel != null) panel.log("  training GeoJSON: " + geoFname);
                 }
             } catch (Exception e) {
-                panel.log("  WARNING: training GeoJSON export failed — " + e.getMessage());
+                if (panel != null) panel.log("  WARNING: training GeoJSON export failed — " + e.getMessage());
             }
 
             // ── Git commit classifier file (PC-5) ────────────────────────────
@@ -1252,19 +1257,19 @@ public class ActionLogger implements WorkflowListener {
                 record.gitHash = new GitBridge(classifierDir).commit(dest,
                     "QTrace classifier: " + name
                     + " (user=" + user + ", img=" + sha256.substring(0,8) + ")");
-                panel.log("  git       : " + record.gitHash);
+                if (panel != null) panel.log("  git       : " + record.gitHash);
             } catch (Exception e) {
-                panel.log("  WARNING: classifier Git commit failed — " + e.getMessage());
+                if (panel != null) panel.log("  WARNING: classifier Git commit failed — " + e.getMessage());
             }
 
             // ── TPC JSON (PC-TPC) ────────────────────────────────────────────
             writeTpcJson(record);
 
             // ── Enable Generate button — classifier data alone is worth exporting ─
-            panel.setGenerateReady(true);
+            if (panel != null) panel.setRecordReady(true);
 
         } catch (Exception e) {
-            panel.log("Classifier capture error: " + e.getMessage());
+            if (panel != null) panel.log("Classifier capture error: " + e.getMessage());
         }
     }
 
@@ -1321,10 +1326,10 @@ public class ActionLogger implements WorkflowListener {
 
             Files.writeString(outDir.resolve(filename), gson.toJson(root));
             record.tpcFilePath = filename;
-            panel.log("  TPC JSON    : " + filename);
+            if (panel != null) panel.log("  TPC JSON    : " + filename);
 
         } catch (Exception e) {
-            panel.log("  WARNING: TPC JSON write failed — " + e.getMessage());
+            if (panel != null) panel.log("  WARNING: TPC JSON write failed — " + e.getMessage());
         }
     }
 
@@ -1340,7 +1345,7 @@ public class ActionLogger implements WorkflowListener {
             boolean affected = record.trainingAnnotationIds.stream().anyMatch(changedIds::contains);
             if (affected) {
                 record.modifiedAfterTraining = true;
-                panel.log("⚠ INTEGRITY: training data for '" + record.name
+                if (panel != null) panel.log("⚠ INTEGRITY: training data for '" + record.name
                     + "' modified after save → Classifier_Fidelity = DEGRADED");
             }
         }

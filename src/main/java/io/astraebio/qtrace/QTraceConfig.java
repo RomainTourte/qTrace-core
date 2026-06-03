@@ -28,7 +28,6 @@ public class QTraceConfig {
     private static volatile QTraceConfig instance;
 
     // Stored fields (null = use default)
-    private String metaScriptDir;
     private String exportDir;
     private String classifierDir;
     private String trainingDir;
@@ -47,14 +46,12 @@ public class QTraceConfig {
 
     // ── Path getters ─────────────────────────────────────────────────────────
 
-    public Path getMetaScriptDir()  { return resolve(metaScriptDir);  }
     public Path getExportDir()      { return resolve(exportDir);       }
     public Path getClassifierDir()  { return resolve(classifierDir);   }
     public Path getTrainingDir()    { return resolve(trainingDir);     }
 
     // ── Path setters ─────────────────────────────────────────────────────────
 
-    public void setMetaScriptDir(String p)  { this.metaScriptDir  = blank(p); }
     public void setExportDir(String p)      { this.exportDir       = blank(p); }
     public void setClassifierDir(String p)  { this.classifierDir   = blank(p); }
     public void setTrainingDir(String p)    { this.trainingDir     = blank(p); }
@@ -67,7 +64,6 @@ public class QTraceConfig {
 
     // ── Raw string getters (for the dialog text fields) ───────────────────────
 
-    public String rawMetaScriptDir()  { return metaScriptDir  != null ? metaScriptDir  : ""; }
     public String rawExportDir()      { return exportDir       != null ? exportDir       : ""; }
     public String rawClassifierDir()  { return classifierDir   != null ? classifierDir   : ""; }
     public String rawTrainingDir()    { return trainingDir     != null ? trainingDir     : ""; }

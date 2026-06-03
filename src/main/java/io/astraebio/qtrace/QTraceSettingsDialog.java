@@ -40,7 +40,6 @@ public class QTraceSettingsDialog {
         QTraceConfig cfg = QTraceConfig.get();
 
         // ── Path rows ──────────────────────────────────────────────────────────
-        TextField tfMetaScript  = pathField(cfg.rawMetaScriptDir());
         TextField tfExport      = pathField(cfg.rawExportDir());
         TextField tfClassifier  = pathField(cfg.rawClassifierDir());
         TextField tfTraining    = pathField(cfg.rawTrainingDir());
@@ -59,10 +58,9 @@ public class QTraceSettingsDialog {
         btnCol.setMinWidth(70);
         grid.getColumnConstraints().addAll(labelCol, fieldCol, btnCol);
 
-        addRow(grid, 0, "Meta-Scripts (.groovy)",     tfMetaScript,  dlg);
-        addRow(grid, 1, ".qtrace + CSV export",        tfExport,      dlg);
-        addRow(grid, 2, "Classifier Git tracking",     tfClassifier,  dlg);
-        addRow(grid, 3, "Training GeoJSON",            tfTraining,    dlg);
+        addRow(grid, 0, ".qtrace + CSV export",        tfExport,      dlg);
+        addRow(grid, 1, "Classifier Git tracking",     tfClassifier,  dlg);
+        addRow(grid, 2, "Training GeoJSON",            tfTraining,    dlg);
 
         // Hint
         Label hint = new Label("Leave blank to use default: " + QTraceConfig.defaultDirString());
@@ -113,7 +111,6 @@ public class QTraceSettingsDialog {
         Button btnOk     = solidButton("Save",                BLUE);
 
         btnReset.setOnAction(e -> {
-            tfMetaScript.clear();
             tfExport.clear();
             tfClassifier.clear();
             tfTraining.clear();
@@ -123,7 +120,6 @@ public class QTraceSettingsDialog {
         btnCancel.setOnAction(e -> dlg.close());
 
         btnOk.setOnAction(e -> {
-            cfg.setMetaScriptDir(tfMetaScript.getText());
             cfg.setExportDir(tfExport.getText());
             cfg.setClassifierDir(tfClassifier.getText());
             cfg.setTrainingDir(tfTraining.getText());

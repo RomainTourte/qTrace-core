@@ -12,14 +12,9 @@ import qupath.lib.images.ImageData;
 import qupath.lib.objects.PathObject;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import javafx.stage.FileChooser;
-import qupath.lib.projects.Project;
 import qupath.lib.projects.ProjectImageEntry;
-import qupath.lib.projects.ProjectIO;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -29,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * Main coordinator for QTrace.
@@ -37,14 +33,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Runtime target is QuPath 0.7.x — API is a strict superset, fully compatible.
  * Protected/package-private methods are accessed via reflection at runtime.
  *
- * Phase 1  : panel lifecycle, viewer listener.
- * Phase 2  : ActionLogger wired — real-time step capture + SHA-256.
- * Phase 2.5: Script Editor hook — auto-captures every Run click as a workflow step.
- *            Output captured via Logback appender on DefaultScriptEditor logger.
- * Phase 3  : MetaScriptGenerator (stub).
- * Phase 4  : GitBridge (stub).
- * Phase 5  : ValidationStamper (stub).
- * Phase 6  : QTraceExporter (stub).
+ * Captures QuPath analysis provenance (steps, classifiers, annotations) and
+ * exports to .qtrace JSON sidecar after expert validation via ValidationStamper.
  */
 public class QTraceController {
 
@@ -65,12 +55,31 @@ public class QTraceController {
     private volatile boolean          capturingOutput = false;
     private final List<String>        capturedOutput  = new CopyOnWriteArrayList<>();
 
-    // Phase 4 + 5 state ──────────────────────────────────────────────────────
-    private String          lastGitHash = null;
-    private ValidationStamp lastStamp   = null;
+    // Validation state
+    private ValidationStamp lastStamp = null;
+
+    // Recording state listeners (toolbar icon, etc.)
+    private final List<Consumer<Boolean>> recordingListeners = new CopyOnWriteArrayList<>();
+
+    public void addRecordingListener(Consumer<Boolean> l) { recordingListeners.add(l); }
+
+    void fireRecordingState(boolean active) {
+        recordingListeners.forEach(l -> Platform.runLater(() -> l.accept(active)));
+    }
+
+    public boolean isRecording() {
+        return logger != null && logger.isAttached();
+    }
 
     public QTraceController(QuPathGUI qupath) {
         this.qupath = qupath;
+        // Logger starts immediately — panel-less, silent until panel is attached
+        this.logger = new ActionLogger(qupath, null);
+        ImageData<BufferedImage> current = qupath.getImageData();
+        if (current != null) {
+            logger.attach(current);
+            fireRecordingState(true);
+        }
         attachViewerListener();
     }
 
@@ -78,14 +87,29 @@ public class QTraceController {
 
     public void showPanel() {
         if (panel == null || !panel.isShowing()) {
-            panel  = new QTracePanel(qupath, this);
-            logger = new ActionLogger(qupath, panel);
-
-            ImageData<BufferedImage> current = qupath.getImageData();
-            if (current != null) logger.attach(current);
+            panel = new QTracePanel(qupath, this);
+            logger.setPanel(panel);
+            syncPanelState();
         }
         panel.show();
         attachScriptEditorHook();
+    }
+
+    private void syncPanelState() {
+        if (panel == null) return;
+        boolean attached = logger.isAttached();
+        int steps        = logger.getCapturedSteps().size();
+        int preExisting  = logger.getPreExistingStepCount();
+        int manual       = logger.getManualAnnotationCount();
+        Platform.runLater(() -> {
+            panel.setRecordingActive(attached);
+            panel.updateStepCount(steps, preExisting, manual);
+            panel.setRecordReady(steps > 0);
+            if (attached && steps > 0)
+                panel.log("qTrace already recording — " + steps + " step(s) captured before panel opened.");
+            else if (attached)
+                panel.log("qTrace recording — waiting for first action.");
+        });
     }
 
     public void showDashboard() {
@@ -286,16 +310,19 @@ public class QTraceController {
             public void imageDataChanged(QuPathViewer viewer,
                                          ImageData<BufferedImage> oldData,
                                          ImageData<BufferedImage> newData) {
-                if (logger != null) logger.attach(newData);
-                if (panel  != null && panel.isShowing()) {
-                    Platform.runLater(panel::refreshStatus);
+                if (logger != null) {
+                    logger.attach(newData);
+                    fireRecordingState(newData != null);
                 }
+                if (panel != null && panel.isShowing())
+                    Platform.runLater(panel::refreshStatus);
             }
 
             @Override public void visibleRegionChanged(QuPathViewer v, java.awt.Shape s) {}
             @Override public void selectedObjectChanged(QuPathViewer v, PathObject o)     {}
             @Override public void viewerClosed(QuPathViewer v) {
                 if (logger != null) logger.detach();
+                fireRecordingState(false);
             }
         });
     }
@@ -311,60 +338,14 @@ public class QTraceController {
 
     // ── Action stubs ─────────────────────────────────────────────────────────
 
-    public void generateMetaScript() {
+    public void recordTrace() {
         if (logger == null || !logger.hasSteps()) {
-            if (panel != null) panel.log("Nothing to generate — no steps captured yet.");
+            if (panel != null) panel.log("Nothing to record — no steps captured yet.");
             return;
         }
-        try {
-            // Sync final annotation state (name/class/color/description/locked) before
-            // generating — QuPath doesn't always fire hierarchy events on property edits.
-            logger.refreshAllAnnotationCaptures();
-
-            Path outDir  = QTraceConfig.get().getMetaScriptDir();
-            Path outFile = new MetaScriptGenerator(logger).generate(outDir);
-
-            // ── Git commit (Phase 4) ─────────────────────────────────────────
-            String imageName = logger.getCurrentImageData()
-                                     .getServer().getMetadata().getName();
-            String hash      = logger.getImageHash();
-            String commitMsg = buildCommitMessage(imageName, hash,
-                                                  logger.getCapturedSteps().size());
-            lastGitHash = new GitBridge(outDir).commit(outFile, commitMsg);
-
-            if (panel != null) {
-                panel.log("Meta-Script committed:");
-                panel.log("  file: " + outFile.getFileName());
-                panel.log("  git : " + lastGitHash);
-                if (hash != null) panel.log("  img : " + hash.substring(0, 16) + "...");
-                panel.log("→ Click 'Validate & Stamp' to sign this capture.");
-                panel.setScriptReady(true);
-            }
-        } catch (Exception e) {
-            if (panel != null) panel.log("MetaScript/Git error: " + e.getMessage());
-        }
-    }
-
-    private static String buildCommitMessage(String imageName, String hash, int steps) {
-        return "QTrace capture: " + imageName + "\n\n"
-             + "Image   : " + imageName + "\n"
-             + "SHA-256 : " + (hash != null ? hash : "(pending)") + "\n"
-             + "Steps   : " + steps + "\n"
-             + "QTrace  : v" + VERSION;
-    }
-
-    public void validateAndStamp() {
-        if (logger == null || !logger.hasSteps()) {
-            if (panel != null) panel.log("Nothing to validate — generate a Meta-Script first.");
-            return;
-        }
-        if (lastGitHash == null) {
-            if (panel != null) panel.log("Generate a Meta-Script first (creates the Git commit to stamp).");
-            return;
-        }
-
+        logger.refreshAllAnnotationCaptures();
         String currentStatus = readCurrentStatus();
-        ValidationStamper.show(qupath.getStage(), lastGitHash, logger.getImageHash(),
+        ValidationStamper.show(qupath.getStage(), null, logger.getImageHash(),
                                logger.computeClassifierFidelity(), currentStatus)
             .ifPresentOrElse(
                 stamp -> {
@@ -376,11 +357,11 @@ public class QTraceController {
                         panel.log("  confidence : " + stamp.confidence());
                         if (!stamp.notes().isEmpty())
                             panel.log("  notes      : " + stamp.notes());
-                        panel.log("→ Click 'Export .qtrace' to write the JSON sidecar.");
                         panel.setValidated(true, stamp.validator());
                     }
+                    exportReport();
                 },
-                () -> { if (panel != null) panel.log("Validation cancelled."); }
+                () -> { if (panel != null) panel.log("Record cancelled."); }
             );
     }
 
@@ -402,381 +383,27 @@ public class QTraceController {
             if (panel != null) panel.log("Nothing to export — capture steps first.");
             return;
         }
-        if (lastGitHash == null) {
-            if (panel != null) panel.log("Generate a Meta-Script first (Git commit required).");
-            return;
-        }
         try {
             Path outDir  = QTraceConfig.get().getExportDir();
-            var exporter = new QTraceExporter(logger, lastGitHash, lastStamp);
+            var exporter = new QTraceExporter(logger, null, lastStamp);
             Path outFile = exporter.export(outDir);
             Path csvFile = exporter.appendToMasterCsv(outDir);
 
             if (panel != null) {
-                panel.log(".qtrace sidecar written:");
+                panel.log(".qtrace written:");
                 panel.log("  " + outFile.getFileName());
                 panel.log("  CSV: " + csvFile.getFileName());
-                if (lastStamp == null)
-                    panel.log("  (no validation stamp — run 'Validate & Stamp' first)");
             }
         } catch (Exception e) {
             if (panel != null) panel.log("Export error: " + e.getMessage());
         }
     }
 
-    // ── Import & Replay (Phase 3.5) ──────────────────────────────────────────
+    // ── Import .qTrace (Enterprise stub) ─────────────────────────────────────
 
-    /**
-     * Shows a FileChooser and loads the selected .groovy or .qtrace into the
-     * Script Editor. The script is NOT run automatically — the hook captures
-     * it when the user clicks Run, maintaining the normal recording flow.
-     */
     public void importAndReplay() {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Import Script for Replay");
-        chooser.getExtensionFilters().addAll(
-            new FileChooser.ExtensionFilter("QTrace & Groovy", "*.groovy", "*.qtrace"),
-            new FileChooser.ExtensionFilter("Groovy scripts", "*.groovy"),
-            new FileChooser.ExtensionFilter("QTrace sidecars", "*.qtrace")
-        );
-        File initDir = QTraceConfig.get().getMetaScriptDir().toFile();
-        if (initDir.exists()) chooser.setInitialDirectory(initDir);
-
-        File selected = chooser.showOpenDialog(qupath.getStage());
-        if (selected == null) return;
-
-        try {
-            if (selected.getName().endsWith(".qtrace")) {
-                loadQTraceFile(selected);
-            } else {
-                loadGroovyFile(selected);
-            }
-        } catch (Exception e) {
-            if (panel != null) panel.log("Import error: " + e.getMessage());
-        }
-    }
-
-    /** Reads a .groovy file, opens it in the Script Editor, and auto-opens the recorded project/image. */
-    private void loadGroovyFile(File file) throws Exception {
-        String content = Files.readString(file.toPath());
-        openInScriptEditor(file.getName(), content);
-        if (panel != null) {
-            panel.log("Script imported: " + file.getName());
-            panel.log("  → Review in Script Editor, then click Run to replay.");
-        }
-        // Parse provenance header for project path and image name
-        String imageName   = null;
-        String projectPath = null;
-        for (String line : content.split("\n")) {
-            if (line.startsWith("// Image") && line.contains(":")) {
-                int idx = line.indexOf(": ");
-                if (idx < 0) idx = line.indexOf(":");
-                if (idx >= 0) imageName = line.substring(idx + 1).strip();
-            } else if (line.startsWith("// Project") && line.contains(":")) {
-                int idx = line.indexOf(": ");
-                if (idx < 0) idx = line.indexOf(":");
-                if (idx >= 0) projectPath = line.substring(idx + 1).strip();
-            } else if (!line.startsWith("//") && !line.isBlank()) {
-                break;
-            }
-        }
-        tryOpenProjectAndImage(projectPath, imageName);
-    }
-
-    /**
-     * Parses a .qtrace sidecar, shows provenance (including SHA-256 mismatch
-     * warning if the current image differs), reconstructs the script from
-     * captured step fragments, and opens it in the Script Editor.
-     */
-    /** Returns the last element of sessions[], or null if absent/empty. */
-    private static JsonObject latestSession(JsonObject root) {
-        if (root == null || !root.has("sessions") || root.get("sessions").isJsonNull()) return null;
-        JsonArray sessions = root.getAsJsonArray("sessions");
-        if (sessions.size() == 0) return null;
-        return sessions.get(sessions.size() - 1).getAsJsonObject();
-    }
-
-    private void loadQTraceFile(File file) throws Exception {
-        String json = Files.readString(file.toPath());
-        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-
-        if (panel != null) panel.log("=== .qtrace import: " + file.getName() + " ===");
-
-        // Format 2.0: image is at root, session-level data is in sessions[-1]
-        JsonObject session = latestSession(root);
-        // Fallback: format <2.0 kept everything at root — treat root as session
-        JsonObject sessionOrRoot = (session != null) ? session : root;
-
-        // ── Provenance display ───────────────────────────────────────────────
-        if (root.has("image") && !root.get("image").isJsonNull()) {
-            JsonObject img = root.getAsJsonObject("image");
-            String importedHash = img.has("sha256") ? img.get("sha256").getAsString() : null;
-            String importedName = img.has("name")   ? img.get("name").getAsString()   : "?";
-
-            if (panel != null) panel.log("  image : " + importedName);
-
-            // SHA-256 check against current image
-            String currentHash = (logger != null) ? logger.getImageHash() : null;
-            if (importedHash != null && currentHash != null) {
-                if (importedHash.equals(currentHash)) {
-                    if (panel != null) panel.log("  SHA-256: MATCH ✓ — same source image");
-                } else {
-                    if (panel != null) {
-                        panel.log("  SHA-256: MISMATCH ⚠");
-                        panel.log("    recorded : " + importedHash.substring(0, 16) + "...");
-                        panel.log("    current  : " + currentHash.substring(0, 16) + "...");
-                        panel.log("  WARNING: script was recorded on a different image.");
-                    }
-                }
-            } else if (importedHash != null && panel != null) {
-                panel.log("  SHA-256: " + importedHash.substring(0, 16) + "...");
-            }
-        }
-
-        if (sessionOrRoot.has("git") && !sessionOrRoot.get("git").isJsonNull()) {
-            JsonObject git = sessionOrRoot.getAsJsonObject("git");
-            if (panel != null && git.has("commit"))
-                panel.log("  git   : " + git.get("commit").getAsString());
-        }
-
-        if (sessionOrRoot.has("validation") && !sessionOrRoot.get("validation").isJsonNull()) {
-            JsonObject val = sessionOrRoot.getAsJsonObject("validation");
-            if (panel != null)
-                panel.log("  valid : " + val.get("validator").getAsString()
-                    + " / " + val.get("scope").getAsString()
-                    + " / " + val.get("confidence").getAsString());
-        }
-
-        if (session != null && panel != null) {
-            String user    = session.has("user")    ? session.get("user").getAsString()    : null;
-            String machine = session.has("machine") ? session.get("machine").getAsString() : null;
-            if (user != null)
-                panel.log("  session: " + user + (machine != null ? "@" + machine : "")
-                    + " (session " + (root.getAsJsonArray("sessions").size()) + ")");
-        }
-
-        // Extract project path + image name for auto-open
-        String importedImageName   = null;
-        String importedProjectPath = null;
-
-        if (root.has("image") && !root.get("image").isJsonNull()) {
-            JsonObject imgObj = root.getAsJsonObject("image");
-            if (imgObj.has("name")) importedImageName = imgObj.get("name").getAsString();
-        }
-
-        if (sessionOrRoot.has("project") && !sessionOrRoot.get("project").isJsonNull()) {
-            JsonObject proj = sessionOrRoot.getAsJsonObject("project");
-            if (panel != null && proj.has("name"))
-                panel.log("  project: " + proj.get("name").getAsString());
-            if (proj.has("path")) importedProjectPath = proj.get("path").getAsString();
-            if (proj.has("images")) {
-                JsonArray imgs = proj.getAsJsonArray("images");
-                if (imgs.size() > 0 && panel != null) {
-                    int shown = Math.min(imgs.size(), 5);
-                    for (int i = 0; i < shown; i++)
-                        panel.log("    [" + i + "] " + imgs.get(i).getAsString());
-                    if (imgs.size() > 5)
-                        panel.log("    … and " + (imgs.size() - 5) + " more");
-                }
-            }
-        }
-
-        // ── Extract embedded classifier models from latest session ───────────
-        java.util.Map<String, String> embeddedClassifiers = new java.util.LinkedHashMap<>();
-        JsonElement classifiersEl = sessionOrRoot.has("pixel_classifiers")
-            ? sessionOrRoot.get("pixel_classifiers") : null;
-        if (classifiersEl != null && classifiersEl.isJsonArray()) {
-            for (var el : classifiersEl.getAsJsonArray()) {
-                JsonObject clf = el.getAsJsonObject();
-                if (!clf.has("name") || !clf.has("classifier_json")) continue;
-                String clfName    = clf.get("name").getAsString();
-                String clfContent = clf.getAsJsonObject("classifier_json").toString();
-                embeddedClassifiers.put(clfName, clfContent);
-                if (panel != null)
-                    panel.log("  classifier: " + clfName
-                        + (clf.has("classifier_type") ? " (" + clf.get("classifier_type").getAsString() + ")" : ""));
-            }
-        }
-
-        // ── Reconstruct script from step fragments ───────────────────────────
-        StringBuilder sb = new StringBuilder();
-        sb.append("// Replayed from: ").append(file.getName()).append("\n");
-        String qtraceVer = sessionOrRoot.has("qtrace_version")
-            ? sessionOrRoot.get("qtrace_version").getAsString() : null;
-        if (qtraceVer != null)
-            sb.append("// QTrace v").append(qtraceVer).append("\n");
-        sb.append("\nimport static qupath.lib.gui.scripting.QPEx.*\n\n");
-
-        JsonElement stepsEl = sessionOrRoot.has("steps") ? sessionOrRoot.get("steps") : null;
-        if (stepsEl != null && stepsEl.isJsonArray()) {
-            JsonArray steps = stepsEl.getAsJsonArray();
-            int scriptSteps = 0;
-            java.util.Set<String> restoredClassifiers = new java.util.LinkedHashSet<>();
-            for (var el : steps) {
-                JsonObject step = el.getAsJsonObject();
-                if (step.has("script_fragment") && !step.get("script_fragment").isJsonNull()) {
-                    String frag = step.get("script_fragment").getAsString();
-                    if (!frag.isBlank()) {
-                        for (var entry : embeddedClassifiers.entrySet()) {
-                            if (!restoredClassifiers.contains(entry.getKey())
-                                    && frag.contains("\"" + entry.getKey() + "\"")) {
-                                sb.append(buildClassifierRestoreScript(entry.getKey(), entry.getValue()));
-                                restoredClassifiers.add(entry.getKey());
-                            }
-                        }
-                        sb.append("// ── ").append(step.get("command").getAsString()).append(" ──\n");
-                        sb.append(frag.strip()).append("\n\n");
-                        scriptSteps++;
-                    }
-                }
-            }
-            if (panel != null) panel.log("  steps : " + scriptSteps + " scriptable step(s) loaded");
-        }
-
-        String name = file.getName().replace(".qtrace", "_replay.groovy");
-        openInScriptEditor(name, sb.toString());
-        if (panel != null) panel.log("  → Review in Script Editor, then click Run to replay.");
-        tryOpenProjectAndImage(importedProjectPath, importedImageName);
-    }
-
-    /** Opens content in the Script Editor via the public ScriptEditor interface. */
-    private void openInScriptEditor(String name, String content) {
-        ScriptEditor se = qupath.getScriptEditor();
-        if (se == null) {
-            if (panel != null)
-                panel.log("  Script Editor not open — please open it first (Automate menu).");
-            return;
-        }
-        se.showScript(name, content);
-    }
-
-    // ── Classifier restore script builder ────────────────────────────────────
-
-    private static String buildClassifierRestoreScript(String clfName, String jsonContent) {
-        String safe = clfName.replaceAll("[^a-zA-Z0-9_]", "_");
-        String b64  = java.util.Base64.getEncoder().encodeToString(
-            jsonContent.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        return "// ── Restore pixel classifier: " + clfName + " ──\n"
-             + "try {\n"
-             + "    def _b64_" + safe + " = \"" + b64 + "\"\n"
-             + "    def _json_" + safe + " = new String(java.util.Base64.getDecoder().decode(_b64_" + safe + "), \"UTF-8\")\n"
-             + "    def _dir_" + safe + " = getProject().getPath().getParent()\n"
-             + "        .resolve(\"classifiers\").resolve(\"pixel_classifiers\")\n"
-             + "    java.nio.file.Files.createDirectories(_dir_" + safe + ")\n"
-             + "    java.nio.file.Files.writeString(_dir_" + safe + ".resolve(\"" + clfName + ".json\"), _json_" + safe + ")\n"
-             + "    println(\"[QTrace] Classifier '" + clfName + "' restored.\")\n"
-             + "} catch (Exception _e_" + safe + ") {\n"
-             + "    println(\"[QTrace] WARNING: classifier restore failed — \" + _e_" + safe + ".getMessage())\n"
-             + "}\n\n";
-    }
-
-    // ── Import helpers — auto-open project + image ───────────────────────────
-
-    /**
-     * After importing a .groovy or .qtrace file, try to open the recorded
-     * QuPath project (if different from the current one) and navigate to the
-     * recorded image.  Fails gracefully: logs instructions if the API method
-     * is unavailable or the project/image is not found on disk.
-     */
-    private void tryOpenProjectAndImage(String projectPath, String imageName) {
-        if ((projectPath == null || projectPath.isBlank()) && (imageName == null || imageName.isBlank())) return;
-        Platform.runLater(() -> {
-            try {
-                if (projectPath != null && !projectPath.isBlank()) {
-                    Path pPath = Path.of(projectPath);
-                    if (!Files.exists(pPath)) {
-                        if (panel != null) panel.log("  ⚠ Recorded project not found on disk: " + projectPath);
-                        openImageInCurrentProject(imageName);
-                        return;
-                    }
-                    var current = qupath.getProject();
-                    boolean same = current != null && current.getPath() != null
-                        && current.getPath().toAbsolutePath().equals(pPath.toAbsolutePath());
-                    if (!same) {
-                        if (panel != null) panel.log("  → Opening recorded project: " + pPath.getFileName());
-                        boolean opened = tryOpenProject(pPath.toFile());
-                        if (opened && imageName != null && !imageName.isBlank()) {
-                            javafx.animation.PauseTransition delay =
-                                new javafx.animation.PauseTransition(javafx.util.Duration.millis(1500));
-                            String img = imageName;
-                            delay.setOnFinished(e -> Platform.runLater(() -> openImageInCurrentProject(img)));
-                            delay.play();
-                        } else if (!opened) {
-                            if (panel != null) {
-                                panel.log("  ⚠ Auto-open project not available — open manually:");
-                                panel.log("    " + projectPath);
-                                if (imageName != null) panel.log("  Then open image: " + imageName);
-                            }
-                        }
-                        return;
-                    }
-                }
-                openImageInCurrentProject(imageName);
-            } catch (Exception e) {
-                if (panel != null) panel.log("  Auto-open error: " + e.getMessage());
-            }
-        });
-    }
-
-    @SuppressWarnings("unchecked")
-    private boolean tryOpenProject(File projectFile) {
-        try {
-            // Load the Project object from disk (ProjectIO is in qupath-core, always available)
-            Project<BufferedImage> project =
-                (Project<BufferedImage>) ProjectIO.loadProject(projectFile, BufferedImage.class);
-            if (project == null) return false;
-
-            // QuPath 0.7.x: loadProject(Project<BufferedImage>)
-            // QuPath 0.5.x: setProject(Project<BufferedImage>) as fallback
-            for (String name : new String[]{"loadProject", "setProject"}) {
-                Method m = findMethodWithParam(qupath.getClass(), name, Project.class);
-                if (m != null) {
-                    m.invoke(qupath, project);
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            if (panel != null) panel.log("  openProject error: " + e.getMessage());
-        }
-        return false;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void openImageInCurrentProject(String imageName) {
-        if (imageName == null || imageName.isBlank()) return;
-        try {
-            var project = qupath.getProject();
-            if (project == null) {
-                if (panel != null) panel.log("  ⚠ No project open — cannot navigate to image.");
-                return;
-            }
-            var match = project.getImageList().stream()
-                .filter(e -> {
-                    String n = e.getImageName();
-                    return n.equals(imageName) || imageName.contains(n) || n.contains(imageName);
-                })
-                .findFirst();
-            match.ifPresentOrElse(
-                entry -> {
-                    try {
-                        Method m = findMethodWithParam(qupath.getClass(),
-                            "openImageEntry", ProjectImageEntry.class);
-                        if (m != null) {
-                            m.invoke(qupath, entry);
-                            if (panel != null) panel.log("  ✓ Opened image: " + entry.getImageName());
-                        } else {
-                            if (panel != null) panel.log(
-                                "  ⚠ Auto-navigate unavailable — open image manually: " + imageName);
-                        }
-                    } catch (Exception ex) {
-                        if (panel != null) panel.log("  Image open error: " + ex.getMessage());
-                    }
-                },
-                () -> { if (panel != null) panel.log("  ⚠ Image not found in project: " + imageName); }
-            );
-        } catch (Exception e) {
-            if (panel != null) panel.log("  Project lookup error: " + e.getMessage());
-        }
+        QTracePlugin plugin = QTracePluginManager.get();
+        if (plugin != null) plugin.replay(qupath, logger);
     }
 
     private static Method findMethodWithParam(Class<?> cls, String name, Class<?> paramType) {
@@ -809,20 +436,13 @@ public class QTraceController {
 
         logger.refreshAllAnnotationCaptures();
 
-        Path outDir  = QTraceConfig.get().getMetaScriptDir();
-        Path outFile = new MetaScriptGenerator(logger).generate(outDir);
-
-        String imageName = logger.getCurrentImageData().getServer().getMetadata().getName();
-        String hash      = logger.getImageHash();
-        String commitMsg = buildCommitMessage(imageName, hash, logger.getCapturedSteps().size());
-        lastGitHash = new GitBridge(outDir).commit(outFile, commitMsg);
-
+        String hash = logger.getImageHash();
         lastStamp = new ValidationStamp(
             validator, java.time.Instant.now(), scope, confidence, notes,
-            lastGitHash, hash, logger.computeClassifierFidelity().name(), 1, "1-In Progress");
+            null, hash, logger.computeClassifierFidelity().name(), 1, "1-In Progress");
 
         Path exportDir = QTraceConfig.get().getExportDir();
-        var  exporter  = new QTraceExporter(logger, lastGitHash, lastStamp);
+        var  exporter  = new QTraceExporter(logger, null, lastStamp);
         Path out       = exporter.export(exportDir);
         exporter.appendToMasterCsv(exportDir);
         return out.getFileName().toString();
@@ -846,10 +466,8 @@ public class QTraceController {
     public void resetCapture() {
         if (logger == null) return;
         logger.resetCapture();
-        lastGitHash = null;
-        lastStamp   = null;
+        lastStamp = null;
         if (panel != null) {
-            panel.setScriptReady(false);
             panel.setValidated(false, "");
             panel.setRecordingActive(true);
         }
@@ -859,6 +477,5 @@ public class QTraceController {
 
     public QuPathGUI       getQuPath()   { return qupath;    }
     public ActionLogger    getLogger()   { return logger;    }
-    public String          getGitHash()  { return lastGitHash; }
     public ValidationStamp getLastStamp(){ return lastStamp;  }
 }

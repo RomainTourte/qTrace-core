@@ -14,4 +14,5 @@ import qupath.lib.gui.QuPathGUI;
 public interface QTracePlugin {
     default void certifyStamp(ValidationStamp stamp, QuPathGUI qupath) {}
     default void verifyContributor(String contributorId, QuPathGUI qupath) {}
+    default void replay(QuPathGUI qupath, ActionLogger logger) {}
 }

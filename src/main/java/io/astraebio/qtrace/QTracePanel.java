@@ -16,21 +16,6 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import qupath.lib.gui.QuPathGUI;
 
-/**
- * Floating non-modal panel for QTrace.
- *
- * Phase 1 : Full UI scaffold.
- *   - Status section  : recording indicator, image name, step/correction counters
- *   - Action buttons  : Generate Meta-Script / Validate & Stamp / Export Report
- *                       (disabled until Phases 3-6 are implemented)
- *   - Activity log    : scrolling console
- *
- * Public API used by future phases:
- *   updateStepCount(int steps, int manualCorrections)  ← Phase 2
- *   setRecordingActive(boolean)                        ← Phase 2
- *   setScriptReady(boolean)                            ← Phase 3
- *   setValidated(boolean, String)                      ← Phase 5
- */
 public class QTracePanel {
 
     // Catppuccin Mocha palette — chosen to complement QuPath's dark theme
@@ -56,11 +41,8 @@ public class QTracePanel {
     private Label    preExistingLabel;
     private Label    corrCountLabel;
 
-    // Action buttons
-    private Button   btnGenerate;
-    private Button   btnValidate;
-    private Button   btnExport;
-    private Button   btnReplay;
+    // Record button (header)
+    private Button   btnRecord;
 
     // Log
     private TextArea logArea;
@@ -73,9 +55,9 @@ public class QTracePanel {
         stage.setTitle(QTraceController.getEditionLabel());
         stage.setResizable(true);
         stage.setMinWidth(280);
-        stage.setMinHeight(380);
+        stage.setMinHeight(340);
         stage.setWidth(320);
-        stage.setHeight(520);
+        stage.setHeight(460);
         Image logo = loadLogo();
         if (logo != null) stage.getIcons().add(logo);
         stage.setScene(new Scene(buildRoot()));
@@ -98,8 +80,6 @@ public class QTracePanel {
             separator(),
             buildStatusSection(),
             separator(),
-            buildButtonSection(),
-            separator(),
             logSection,
             buildFooter()
         );
@@ -119,12 +99,37 @@ public class QTracePanel {
         title.setFont(Font.font("System", FontWeight.BOLD, 18));
         title.setFill(Color.web(TEXT_MAIN));
 
-        Text sub = new Text("Workflow Provenance");
+        Text sub = new Text("Workflow Provenance — v" + QTraceController.VERSION);
         sub.setFont(Font.font("System", 11));
         sub.setFill(Color.web(TEXT_MUTED));
 
+        VBox titleBlock = new VBox(1, title, sub);
+        titleBlock.setAlignment(Pos.CENTER_LEFT);
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        // ◉ Record your Trace — primary action button
+        btnRecord = new Button("◉");
+        btnRecord.setFont(Font.font("System", FontWeight.BOLD, 16));
+        btnRecord.setTextFill(Color.web(TEXT_MUTED));
+        Tooltip recordTip = new Tooltip(QTraceI18n.t("btn.record.tooltip"));
+        recordTip.setWrapText(true);
+        recordTip.setMaxWidth(260);
+        btnRecord.setTooltip(recordTip);
+        btnRecord.setDisable(true);
+        btnRecord.setStyle(
+            "-fx-background-color: transparent;"
+          + "-fx-cursor: hand;"
+          + "-fx-padding: 0 4 0 4;"
+        );
+        btnRecord.setOnMouseEntered(e -> {
+            if (!btnRecord.isDisabled()) btnRecord.setTextFill(Color.web("#ff6680"));
+        });
+        btnRecord.setOnMouseExited(e -> {
+            if (!btnRecord.isDisabled()) btnRecord.setTextFill(Color.web(RED));
+        });
+        btnRecord.setOnAction(e -> controller.recordTrace());
 
         Button dashboard = new Button("⊞");
         dashboard.setFont(Font.font("System", 14));
@@ -178,11 +183,7 @@ public class QTracePanel {
         gear.setOnMouseExited(e  -> gear.setTextFill(Color.web(TEXT_MUTED)));
         gear.setOnAction(e -> QTraceSettingsDialog.show(stage));
 
-        Label ver = new Label("v" + QTraceController.VERSION);
-        ver.setTextFill(Color.web(TEXT_MUTED));
-        ver.setFont(Font.font("System", 10));
-
-        header.getChildren().addAll(logoView, title, sub, spacer, dashboard, batchBtn, reset, gear, ver);
+        header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, dashboard, batchBtn, reset, gear);
         return header;
     }
 
@@ -240,62 +241,6 @@ public class QTracePanel {
         Label lbl = new Label(value);
         lbl.setFont(Font.font("System", FontWeight.BOLD, 22));
         return lbl;
-    }
-
-    // ── Button section — horizontal icon bar ─────────────────────────────────
-
-    private HBox buildButtonSection() {
-        btnGenerate = iconButton("⚡", BLUE,  "btn.generate.tooltip", false);
-        btnGenerate.setOnAction(e -> controller.generateMetaScript());
-
-        btnValidate = iconButton("✔", GREEN, "btn.validate.tooltip", false);
-        btnValidate.setOnAction(e -> controller.validateAndStamp());
-
-        btnExport   = iconButton("⬆", RED,   "btn.export.tooltip",   false);
-        btnExport.setOnAction(e -> controller.exportReport());
-
-        btnReplay   = iconButton("▶", PEACH, "btn.replay.tooltip",   true);
-        btnReplay.setOnAction(e -> controller.importAndReplay());
-
-        HBox row = new HBox(10, btnGenerate, btnValidate, btnExport, btnReplay);
-        row.setAlignment(Pos.CENTER);
-        HBox.setHgrow(btnGenerate, Priority.ALWAYS);
-        HBox.setHgrow(btnValidate, Priority.ALWAYS);
-        HBox.setHgrow(btnExport,   Priority.ALWAYS);
-        HBox.setHgrow(btnReplay,   Priority.ALWAYS);
-        return row;
-    }
-
-    private Button iconButton(String icon, String bgColor, String tooltipKey, boolean enabled) {
-        Button btn = new Button(icon);
-        btn.setMaxWidth(Double.MAX_VALUE);
-        btn.setPrefHeight(54);
-        btn.setMinHeight(54);
-        btn.setMaxHeight(54);
-        btn.setFont(Font.font("System", FontWeight.BOLD, 20));
-        Tooltip tip = new Tooltip(QTraceI18n.t(tooltipKey));
-        tip.setWrapText(true);
-        tip.setMaxWidth(300);
-        btn.setTooltip(tip);
-        btn.setDisable(!enabled);
-        applyButtonStyle(btn, bgColor, BG_BASE);
-
-        btn.setOnMouseEntered(e -> {
-            if (!btn.isDisabled()) applyButtonStyle(btn, "derive(" + bgColor + ",-20%)", BG_BASE);
-        });
-        btn.setOnMouseExited(e -> {
-            if (!btn.isDisabled()) applyButtonStyle(btn, bgColor, BG_BASE);
-        });
-        return btn;
-    }
-
-    private void applyButtonStyle(Button btn, String bg, String fg) {
-        btn.setStyle(
-            "-fx-background-color: " + bg + ";"
-          + "-fx-text-fill: " + fg + ";"
-          + "-fx-background-radius: 6;"
-          + "-fx-cursor: hand;"
-        );
     }
 
     // ── Log section ──────────────────────────────────────────────────────────
@@ -430,7 +375,7 @@ public class QTracePanel {
         });
     }
 
-    /** Phase 2 — called by ActionLogger on each captured step. */
+    /** Called by ActionLogger on each captured step. */
     public void updateStepCount(int steps, int preExisting, int manualCorrections) {
         Platform.runLater(() -> {
             stepCountLabel.setText(String.valueOf(steps));
@@ -444,7 +389,7 @@ public class QTracePanel {
         });
     }
 
-    /** Phase 2 — toggle recording indicator. */
+    /** Toggle recording indicator dot. */
     public void setRecordingActive(boolean active) {
         Platform.runLater(() -> {
             if (active) {
@@ -459,24 +404,25 @@ public class QTracePanel {
         });
     }
 
-    /** Phase 2 — enable Generate button once steps are captured. */
-    public void setGenerateReady(boolean ready) {
-        Platform.runLater(() -> btnGenerate.setDisable(!ready));
+    /** Enable the ◉ Record button once steps are captured. */
+    public void setRecordReady(boolean ready) {
+        Platform.runLater(() -> {
+            btnRecord.setDisable(!ready);
+            btnRecord.setTextFill(Color.web(ready ? RED : TEXT_MUTED));
+        });
     }
 
-    /** Phase 3 — enable Validate button once Meta-Script is ready. */
-    public void setScriptReady(boolean ready) {
-        Platform.runLater(() -> btnValidate.setDisable(!ready));
-    }
-
-    /** Phase 5 — enable Export button after expert validation. */
+    /** Update status indicator after validation. */
     public void setValidated(boolean validated, String validatorName) {
         Platform.runLater(() -> {
-            btnExport.setDisable(!validated);
             if (validated) {
                 statusDot.setFill(Color.web(PEACH));
                 statusLabel.setText("Validated by " + validatorName);
                 statusLabel.setTextFill(Color.web(PEACH));
+            } else {
+                statusDot.setFill(Color.web(TEXT_MUTED));
+                statusLabel.setText("Idle — awaiting recording");
+                statusLabel.setTextFill(Color.web(TEXT_SUB));
             }
         });
     }
