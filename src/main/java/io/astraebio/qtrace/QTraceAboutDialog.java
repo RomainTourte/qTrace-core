@@ -21,23 +21,33 @@ import java.net.URI;
 
 public class QTraceAboutDialog {
 
-    // Catppuccin Mocha — identical palette to QTracePanel
     private static final String BG_BASE    = "#1e1e2e";
     private static final String BG_SURFACE = "#181825";
+    private static final String BG_CARD    = "#24273a";
     private static final String BORDER     = "#313244";
     private static final String TEXT_MAIN  = "#cdd6f4";
     private static final String TEXT_SUB   = "#a6adc8";
     private static final String TEXT_MUTED = "#6c7086";
-    private static final String BLUE       = "#89b4fa";
-    private static final String GREEN      = "#a6e3a1";
-    private static final String YELLOW     = "#f9e2af";  // Enterprise gold
-    private static final String RED        = "#f38ba8";
+    private static final String BLUE       = "#89b4fa";   // Core
+    private static final String YELLOW     = "#f9e2af";   // Enterprise
+    private static final String GREEN      = "#a6e3a1";   // Certified
     private static final String TEAL       = "#94e2d5";
+    private static final String ORANGE     = "#fab387";
 
-    private static final String WEBSITE = "https://astraebio.com";
+    private static final String WEBSITE    = "https://astraebio.com";
+    private static final String PORTAL_URL = "https://qtrace.ca/portal";
+
+    enum Mode { CORE, ENTERPRISE, CERTIFIED }
 
     public static void show(QuPathGUI qupath) {
-        boolean enterprise = QTracePluginManager.hasEnterprise();
+        boolean hasEnterprise = QTracePluginManager.hasEnterprise();
+        LicenseInfo activeLicense = null;
+        if (hasEnterprise) {
+            QTracePlugin ep = QTracePluginManager.get();
+            if (ep != null) activeLicense = ep.getActiveLicenseInfo();
+        }
+        Mode mode = !hasEnterprise ? Mode.CORE
+                  : (activeLicense != null ? Mode.CERTIFIED : Mode.ENTERPRISE);
 
         Stage dialog = new Stage();
         dialog.initOwner(qupath.getStage());
@@ -57,7 +67,6 @@ public class QTraceAboutDialog {
           + "-fx-background-radius: 10;"
         );
 
-        // drag-to-move
         double[] drag = {0, 0};
         root.setOnMousePressed(e -> { drag[0] = e.getSceneX(); drag[1] = e.getSceneY(); });
         root.setOnMouseDragged(e -> {
@@ -65,14 +74,13 @@ public class QTraceAboutDialog {
             dialog.setY(e.getScreenY() - drag[1]);
         });
 
-        root.getChildren().addAll(
-            buildTitleBar(dialog),
-            buildHero(logo, enterprise),
-            hRule(),
-            buildFeatureGrid(enterprise),
-            hRule(),
-            buildFooter(enterprise)
-        );
+        root.getChildren().add(buildTitleBar(dialog));
+        root.getChildren().add(buildHero(logo, mode));
+        if (mode == Mode.CERTIFIED) root.getChildren().add(buildCertCard(activeLicense));
+        root.getChildren().add(hRule());
+        root.getChildren().add(buildFeatureGrid(mode));
+        root.getChildren().add(hRule());
+        root.getChildren().add(buildFooter(mode));
 
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
@@ -90,7 +98,7 @@ public class QTraceAboutDialog {
         HBox bar = new HBox();
         bar.setAlignment(Pos.CENTER_RIGHT);
         bar.setPadding(new Insets(8, 12, 0, 12));
-        Button x = ghostButton("✕", TEXT_MUTED, RED, 13);
+        Button x = ghostButton("✕", TEXT_MUTED, "#f38ba8", 13);
         x.setOnAction(e -> dialog.close());
         bar.getChildren().add(x);
         return bar;
@@ -98,7 +106,7 @@ public class QTraceAboutDialog {
 
     // ── Hero ──────────────────────────────────────────────────────────────────
 
-    private static VBox buildHero(Image logo, boolean enterprise) {
+    private static VBox buildHero(Image logo, Mode mode) {
         VBox box = new VBox(8);
         box.setAlignment(Pos.CENTER);
         box.setPadding(new Insets(4, 28, 20, 28));
@@ -114,8 +122,18 @@ public class QTraceAboutDialog {
         name.setFont(Font.font("System", FontWeight.BOLD, 30));
         name.setFill(Color.web(TEXT_MAIN));
 
-        String badgeColor = enterprise ? YELLOW : BLUE;
-        Label badge = new Label(enterprise ? "Enterprise" : "Core");
+        String badgeColor  = switch (mode) {
+            case CORE       -> BLUE;
+            case ENTERPRISE -> YELLOW;
+            case CERTIFIED  -> GREEN;
+        };
+        String badgeText   = switch (mode) {
+            case CORE       -> "Core";
+            case ENTERPRISE -> "Enterprise";
+            case CERTIFIED  -> "✓ Certified";
+        };
+
+        Label badge = new Label(badgeText);
         badge.setStyle(
             "-fx-background-color: " + badgeColor + "22;"
           + "-fx-border-color: " + badgeColor + "66;"
@@ -141,38 +159,87 @@ public class QTraceAboutDialog {
         return box;
     }
 
+    // ── Certified validator card ───────────────────────────────────────────────
+
+    private static VBox buildCertCard(LicenseInfo li) {
+        VBox card = new VBox(4);
+        card.setPadding(new Insets(0, 24, 14, 24));
+
+        VBox inner = new VBox(5);
+        inner.setPadding(new Insets(12, 16, 12, 16));
+        inner.setStyle(
+            "-fx-background-color: " + BG_CARD + ";"
+          + "-fx-border-color: " + GREEN + "44;"
+          + "-fx-border-radius: 8; -fx-background-radius: 8;"
+        );
+
+        Label titleLbl = new Label("✓  Licensed validator");
+        titleLbl.setTextFill(Color.web(GREEN));
+        titleLbl.setFont(Font.font("System", FontWeight.BOLD, 11));
+
+        Label nameLbl = new Label(li.name());
+        nameLbl.setTextFill(Color.web(TEXT_MAIN));
+        nameLbl.setFont(Font.font("System", FontWeight.BOLD, 15));
+
+        Label instLbl = new Label(li.institution().isBlank() ? "" : li.institution());
+        instLbl.setTextFill(Color.web(TEXT_SUB));
+        instLbl.setFont(Font.font("System", 12));
+
+        HBox metaRow = new HBox(16);
+        metaRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label expLbl = new Label("Valid until  " + li.expiresAtFormatted());
+        expLbl.setTextFill(Color.web(TEXT_MUTED));
+        expLbl.setFont(Font.font("System", 11));
+
+        boolean pinSet = QTraceConfig.get().hasPinSet();
+        Label pinLbl = new Label(pinSet ? "●●●●  PIN set" : "No PIN");
+        pinLbl.setTextFill(Color.web(pinSet ? GREEN : ORANGE));
+        pinLbl.setFont(Font.font("System", FontWeight.BOLD, 11));
+
+        metaRow.getChildren().addAll(expLbl, pinLbl);
+
+        inner.getChildren().add(titleLbl);
+        inner.getChildren().add(nameLbl);
+        if (!li.institution().isBlank()) inner.getChildren().add(instLbl);
+        inner.getChildren().add(metaRow);
+
+        card.getChildren().add(inner);
+        return card;
+    }
+
     // ── Feature comparison grid ───────────────────────────────────────────────
 
-    private static GridPane buildFeatureGrid(boolean enterprise) {
+    private static GridPane buildFeatureGrid(Mode mode) {
         GridPane g = new GridPane();
-        g.setHgap(16);
+        g.setHgap(12);
         g.setVgap(6);
-        g.setPadding(new Insets(16, 28, 16, 28));
+        g.setPadding(new Insets(16, 24, 16, 24));
 
         ColumnConstraints featureCol = new ColumnConstraints();
         featureCol.setHgrow(Priority.ALWAYS);
-        ColumnConstraints coreCol = new ColumnConstraints(64);
+        ColumnConstraints coreCol = new ColumnConstraints(56);
         coreCol.setHalignment(HPos.CENTER);
-        ColumnConstraints entCol = new ColumnConstraints(84);
+        ColumnConstraints entCol = new ColumnConstraints(76);
         entCol.setHalignment(HPos.CENTER);
-        g.getColumnConstraints().addAll(featureCol, coreCol, entCol);
+        ColumnConstraints certCol = new ColumnConstraints(72);
+        certCol.setHalignment(HPos.CENTER);
+        g.getColumnConstraints().addAll(featureCol, coreCol, entCol, certCol);
 
         int row = 0;
 
-        // Column headers
-        Label entHeader = colHeader("Enterprise");
-        if (enterprise) entHeader.setTextFill(Color.web(YELLOW));
-        g.add(colHeader(""), 0, row);
-        g.add(colHeader("Core"), 1, row);
-        g.add(entHeader, 2, row);
+        // Column headers — active column highlighted
+        Label entHeader  = colHeader("Enterprise", mode == Mode.ENTERPRISE ? YELLOW : TEXT_MUTED);
+        Label certHeader = colHeader("Certified",  mode == Mode.CERTIFIED  ? GREEN  : TEXT_MUTED);
+        g.add(colHeader("", TEXT_MUTED), 0, row);
+        g.add(colHeader("Core",  mode == Mode.CORE ? BLUE : TEXT_MUTED), 1, row);
+        g.add(entHeader,  2, row);
+        g.add(certHeader, 3, row);
         row++;
 
-        Region r0 = gridRule();
-        g.add(r0, 0, row);
-        GridPane.setColumnSpan(r0, 3);
-        row++;
+        Region r0 = gridRule(); g.add(r0, 0, row); GridPane.setColumnSpan(r0, 4); row++;
 
-        // Features included in both editions
+        // Shared by all editions
         String[] shared = {
             "Workflow step capture (real-time)",
             "Reproducible Meta-Script (Groovy)",
@@ -182,27 +249,43 @@ public class QTraceAboutDialog {
         };
         for (String feat : shared) {
             g.add(featureLabel(feat, false), 0, row);
-            g.add(check(true, false), 1, row);
-            g.add(check(true, true),  2, row);
+            g.add(check(true,  BLUE),   1, row);
+            g.add(check(true,  YELLOW), 2, row);
+            g.add(check(true,  GREEN),  3, row);
             row++;
         }
 
-        Region r1 = gridRule();
-        g.add(r1, 0, row);
-        GridPane.setColumnSpan(r1, 3);
-        row++;
+        Region r1 = gridRule(); g.add(r1, 0, row); GridPane.setColumnSpan(r1, 4); row++;
 
-        // Enterprise-only features — dimmed when running Core
-        String[] premium = {
+        // Enterprise + Certified
+        String[] enterprise = {
             "Dashboard — multi-image viewer",
             "Batch export for full cohorts",
             "Validation Stamp (expert sign-off)",
             "Priority support by AstraeBio",
         };
-        for (String feat : premium) {
-            g.add(featureLabel(feat, !enterprise), 0, row);
-            g.add(check(false, false), 1, row);
-            g.add(check(true, true),   2, row);
+        for (String feat : enterprise) {
+            g.add(featureLabel(feat, mode == Mode.CORE), 0, row);
+            g.add(check(false, BLUE),   1, row);
+            g.add(check(true,  YELLOW), 2, row);
+            g.add(check(true,  GREEN),  3, row);
+            row++;
+        }
+
+        Region r2 = gridRule(); g.add(r2, 0, row); GridPane.setColumnSpan(r2, 4); row++;
+
+        // Certified only
+        String[] certified = {
+            "Identity-certified stamps",
+            "Validator name locked in stamp",
+            "License PIN protection",
+        };
+        for (String feat : certified) {
+            boolean dimmed = mode != Mode.CERTIFIED;
+            g.add(featureLabel(feat, dimmed), 0, row);
+            g.add(check(false, BLUE),   1, row);
+            g.add(check(false, YELLOW), 2, row);
+            g.add(check(true,  GREEN),  3, row);
             row++;
         }
 
@@ -211,39 +294,56 @@ public class QTraceAboutDialog {
 
     // ── Footer ────────────────────────────────────────────────────────────────
 
-    private static HBox buildFooter(boolean enterprise) {
+    private static HBox buildFooter(Mode mode) {
         HBox footer = new HBox(8);
         footer.setAlignment(Pos.CENTER_LEFT);
-        footer.setPadding(new Insets(12, 28, 16, 28));
+        footer.setPadding(new Insets(12, 24, 16, 24));
         footer.setStyle(
             "-fx-background-color: " + BG_SURFACE + ";"
           + "-fx-background-radius: 0 0 10 10;"
         );
 
+        String licenseText = switch (mode) {
+            case CORE       -> "·  Apache 2.0 License";
+            case ENTERPRISE -> "·  Commercial License";
+            case CERTIFIED  -> "·  Commercial License";
+        };
         Label copy    = muted("© 2025 AstraeBio");
-        Label license = muted("·  " + (enterprise ? "Commercial License" : "Apache 2.0 License"));
+        Label license = muted(licenseText);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button website = ghostButton("astraebio.com ↗", TEAL, TEAL, 11);
-        website.setOnAction(e -> openUrl(WEBSITE));
+        footer.getChildren().addAll(copy, license, spacer);
 
-        footer.getChildren().addAll(copy, license, spacer, website);
-
-        if (!enterprise) {
-            Button upgrade = new Button("Upgrade ↑");
+        if (mode == Mode.CORE) {
+            Button upgrade = new Button("Get Enterprise ↑");
             upgrade.setStyle(
                 "-fx-background-color: " + YELLOW + "22;"
               + "-fx-border-color: " + YELLOW + "66;"
               + "-fx-border-radius: 5; -fx-background-radius: 5;"
               + "-fx-text-fill: " + YELLOW + ";"
               + "-fx-font-size: 11; -fx-font-weight: bold;"
-              + "-fx-cursor: hand;"
-              + "-fx-padding: 4 10 4 10;"
+              + "-fx-cursor: hand; -fx-padding: 4 10 4 10;"
             );
-            upgrade.setOnAction(e -> openUrl(WEBSITE + "/enterprise"));
+            upgrade.setOnAction(e -> openUrl(PORTAL_URL));
             footer.getChildren().add(upgrade);
+        } else if (mode == Mode.ENTERPRISE) {
+            Button cert = new Button("Load license →");
+            cert.setStyle(
+                "-fx-background-color: " + GREEN + "22;"
+              + "-fx-border-color: " + GREEN + "66;"
+              + "-fx-border-radius: 5; -fx-background-radius: 5;"
+              + "-fx-text-fill: " + GREEN + ";"
+              + "-fx-font-size: 11; -fx-font-weight: bold;"
+              + "-fx-cursor: hand; -fx-padding: 4 10 4 10;"
+            );
+            cert.setOnAction(e -> openUrl(PORTAL_URL));
+            footer.getChildren().add(cert);
+        } else {
+            Button website = ghostButton("qtrace.ca ↗", TEAL, TEAL, 11);
+            website.setOnAction(e -> openUrl(PORTAL_URL));
+            footer.getChildren().add(website);
         }
 
         return footer;
@@ -251,9 +351,9 @@ public class QTraceAboutDialog {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static Label colHeader(String text) {
+    private static Label colHeader(String text, String color) {
         Label l = new Label(text);
-        l.setTextFill(Color.web(TEXT_MUTED));
+        l.setTextFill(Color.web(color));
         l.setFont(Font.font("System", FontWeight.BOLD, 10));
         l.setMaxWidth(Double.MAX_VALUE);
         l.setAlignment(Pos.CENTER);
@@ -267,10 +367,9 @@ public class QTraceAboutDialog {
         return l;
     }
 
-    private static Label check(boolean present, boolean isEnterpriseColumn) {
+    private static Label check(boolean present, String activeColor) {
         Label l = new Label(present ? "✓" : "—");
-        String color = present ? (isEnterpriseColumn ? YELLOW : GREEN) : TEXT_MUTED;
-        l.setTextFill(Color.web(color));
+        l.setTextFill(Color.web(present ? activeColor : TEXT_MUTED));
         l.setFont(Font.font("System", FontWeight.BOLD, 13));
         l.setMaxWidth(Double.MAX_VALUE);
         l.setAlignment(Pos.CENTER);
