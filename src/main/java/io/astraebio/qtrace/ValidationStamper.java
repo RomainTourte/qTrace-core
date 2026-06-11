@@ -40,10 +40,33 @@ public class ValidationStamper {
         dialog.setHeaderText("Validate this workflow capture");
 
         // ── Form fields ──────────────────────────────────────────────────────
-        String configuredValidator = QTraceConfig.get().getValidatorName();
+        // If Enterprise + valid license: identity is locked to the license holder
+        LicenseInfo activeLicense = null;
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep != null) activeLicense = ep.getActiveLicenseInfo();
+
+        String configuredValidator = (activeLicense != null)
+            ? activeLicense.name()
+            : QTraceConfig.get().getValidatorName();
+
         TextField validatorField = new TextField(configuredValidator);
         validatorField.setPromptText("Dr. Lastname / Analyst ID");
         validatorField.setPrefWidth(280);
+
+        if (activeLicense != null) {
+            // Identity certified — field is read-only
+            validatorField.setEditable(false);
+            validatorField.setStyle(
+                "-fx-background-color: derive(-fx-control-inner-background, -5%);"
+              + "-fx-text-fill: -fx-text-inner-color;"
+              + "-fx-opacity: 1;"
+            );
+            validatorField.setTooltip(new javafx.scene.control.Tooltip(
+                "Identity locked — certified by your qTrace Enterprise license.\n"
+              + "Institution: " + activeLicense.institution() + "\n"
+              + "Valid until: " + activeLicense.expiresAtFormatted()
+            ));
+        }
 
         ComboBox<String> scopeBox = new ComboBox<>(FXCollections.observableArrayList(
             "Full Workflow",
@@ -96,7 +119,10 @@ public class ValidationStamper {
         grid.setPadding(new Insets(20, 20, 10, 20));
 
         int row = 0;
-        grid.add(new Label("Validator *"),        0, row); grid.add(validatorField, 1, row++);
+        Label validatorLabel = activeLicense != null
+            ? styledLabel("Validator  ✓", "#a6e3a1")   // green certified
+            : new Label("Validator *");
+        grid.add(validatorLabel, 0, row); grid.add(validatorField, 1, row++);
         grid.add(new Label("Scope"),              0, row); grid.add(scopeBox,       1, row++);
         grid.add(new Label("Confidence"),         0, row); grid.add(confidenceBox,  1, row++);
         grid.add(new Label("Notes"),              0, row); grid.add(notesArea,      1, row++);
@@ -108,11 +134,13 @@ public class ValidationStamper {
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
-        // Disable OK until a validator name is entered (pre-filled from config = already valid)
+        // Disable OK until a validator name is entered (license lock = always valid)
         Node okBtn = dialog.getDialogPane().lookupButton(ButtonType.OK);
         okBtn.setDisable(validatorField.getText().trim().isEmpty());
-        validatorField.textProperty().addListener((obs, o, n) ->
-            okBtn.setDisable(n.trim().isEmpty()));
+        if (activeLicense == null) {
+            validatorField.textProperty().addListener((obs, o, n) ->
+                okBtn.setDisable(n.trim().isEmpty()));
+        }
 
         // ── Result converter ─────────────────────────────────────────────────
         dialog.setResultConverter(btn -> {
@@ -136,5 +164,11 @@ public class ValidationStamper {
         });
 
         return dialog.showAndWait();
+    }
+
+    private static javafx.scene.control.Label styledLabel(String text, String hexColor) {
+        javafx.scene.control.Label lbl = new javafx.scene.control.Label(text);
+        lbl.setStyle("-fx-text-fill: " + hexColor + "; -fx-font-weight: bold;");
+        return lbl;
     }
 }
