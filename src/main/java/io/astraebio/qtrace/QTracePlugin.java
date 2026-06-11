@@ -15,4 +15,11 @@ public interface QTracePlugin {
     default void certifyStamp(ValidationStamp stamp, QuPathGUI qupath) {}
     default void verifyContributor(String contributorId, QuPathGUI qupath) {}
     default void replay(QuPathGUI qupath, ActionLogger logger) {}
+
+    /**
+     * Validates a .qtlicense JWT token.
+     * Returns a decoded {@link LicenseInfo} if the signature is valid and the token is not expired,
+     * or null if the token is invalid.
+     */
+    default LicenseInfo validateLicense(String token) { return null; }
 }

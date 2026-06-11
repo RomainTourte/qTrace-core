@@ -32,6 +32,7 @@ public class QTraceConfig {
     private String classifierDir;
     private String trainingDir;
     private String validatorName;
+    private String licensePath;
 
     private QTraceConfig() {}
 
@@ -61,6 +62,11 @@ public class QTraceConfig {
     /** Returns the configured validator name, or empty string if not set. */
     public String getValidatorName()        { return validatorName != null ? validatorName : ""; }
     public void   setValidatorName(String v){ this.validatorName = blank(v); }
+
+    // ── Enterprise license ────────────────────────────────────────────────────
+
+    public String getLicensePath()         { return licensePath != null ? licensePath : ""; }
+    public void   setLicensePath(String p) { this.licensePath = blank(p); }
 
     // ── Raw string getters (for the dialog text fields) ───────────────────────
 

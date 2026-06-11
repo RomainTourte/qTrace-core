@@ -9,10 +9,13 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import java.awt.Desktop;
 import java.io.File;
+import java.net.URI;
 
 /**
  * Modal dialog for configuring QTrace export paths.
@@ -29,6 +32,9 @@ public class QTraceSettingsDialog {
     private static final String TEXT_MUTED = "#6c7086";
     private static final String BLUE       = "#89b4fa";
     private static final String GREEN      = "#a6e3a1";
+    private static final String ORANGE     = "#fab387";
+    private static final String RED        = "#f38ba8";
+    private static final String PORTAL_URL = "https://qtrace.ca/portal";
 
     public static void show(Stage owner) {
         Stage dlg = new Stage();
@@ -102,6 +108,81 @@ public class QTraceSettingsDialog {
         validatorHint.setWrapText(true);
         validatorHint.setMaxWidth(440);
 
+        // ── Enterprise License section ─────────────────────────────────────────
+        TextField tfLicense = new TextField(cfg.getLicensePath());
+        tfLicense.setPromptText("(no license loaded)");
+        tfLicense.setPrefHeight(30);
+        tfLicense.setEditable(false);
+        tfLicense.setStyle(
+            "-fx-background-color: " + BG_SURFACE + ";"
+          + "-fx-text-fill: " + TEXT_MAIN + ";"
+          + "-fx-prompt-text-fill: " + TEXT_MUTED + ";"
+          + "-fx-border-color: " + BORDER + ";"
+          + "-fx-border-radius: 4;"
+          + "-fx-background-radius: 4;"
+          + "-fx-font-size: 11;"
+        );
+
+        Label licenseStatusLbl = new Label();
+        licenseStatusLbl.setFont(Font.font("System", FontWeight.NORMAL, 11));
+        licenseStatusLbl.setWrapText(true);
+        licenseStatusLbl.setMaxWidth(440);
+
+        // Validate and display status for current path
+        updateLicenseStatus(licenseStatusLbl, cfg.getLicensePath(), tfValidator);
+
+        Button btnBrowseLicense = flatButton("Browse…", TEXT_MUTED);
+        btnBrowseLicense.setOnAction(e -> {
+            FileChooser fc = new FileChooser();
+            fc.setTitle("Select .qtlicense file");
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("qTrace License", "*.qtlicense"));
+            String current = tfLicense.getText().strip();
+            if (!current.isEmpty()) {
+                File f = new File(current);
+                if (f.getParentFile() != null && f.getParentFile().isDirectory())
+                    fc.setInitialDirectory(f.getParentFile());
+            }
+            File chosen = fc.showOpenDialog(dlg);
+            if (chosen != null) {
+                tfLicense.setText(chosen.getAbsolutePath());
+                updateLicenseStatus(licenseStatusLbl, chosen.getAbsolutePath(), tfValidator);
+            }
+        });
+
+        Button btnGetLicense = flatButton("🔗 Get license", BLUE);
+        btnGetLicense.setOnAction(e -> {
+            try { Desktop.getDesktop().browse(new URI(PORTAL_URL)); }
+            catch (Exception ignored) {}
+        });
+
+        GridPane licenseGrid = new GridPane();
+        licenseGrid.setHgap(8);
+        licenseGrid.setVgap(10);
+        licenseGrid.setPadding(new Insets(4, 20, 8, 20));
+
+        ColumnConstraints lcLabelCol = new ColumnConstraints();
+        lcLabelCol.setMinWidth(140);
+        ColumnConstraints lcFieldCol = new ColumnConstraints();
+        lcFieldCol.setHgrow(Priority.ALWAYS);
+        lcFieldCol.setFillWidth(true);
+        ColumnConstraints lcBtn1Col  = new ColumnConstraints();
+        lcBtn1Col.setMinWidth(70);
+        ColumnConstraints lcBtn2Col  = new ColumnConstraints();
+        lcBtn2Col.setMinWidth(90);
+        licenseGrid.getColumnConstraints().addAll(lcLabelCol, lcFieldCol, lcBtn1Col, lcBtn2Col);
+
+        Label licenseLbl = new Label(".qtlicense file");
+        licenseLbl.setTextFill(Color.web(TEXT_SUB));
+        licenseLbl.setFont(Font.font("System", FontWeight.NORMAL, 12));
+        licenseGrid.add(licenseLbl,      0, 0);
+        licenseGrid.add(tfLicense,       1, 0);
+        licenseGrid.add(btnBrowseLicense,2, 0);
+        licenseGrid.add(btnGetLicense,   3, 0);
+        licenseGrid.add(licenseStatusLbl, 1, 1, 3, 1);
+
+        Separator sep2 = new Separator();
+        sep2.setStyle("-fx-background-color: " + BORDER + ";");
+
         Separator sep = new Separator();
         sep.setStyle("-fx-background-color: " + BORDER + ";");
 
@@ -115,6 +196,8 @@ public class QTraceSettingsDialog {
             tfClassifier.clear();
             tfTraining.clear();
             tfValidator.clear();
+            tfLicense.clear();
+            updateLicenseStatus(licenseStatusLbl, "", tfValidator);
         });
 
         btnCancel.setOnAction(e -> dlg.close());
@@ -124,6 +207,7 @@ public class QTraceSettingsDialog {
             cfg.setClassifierDir(tfClassifier.getText());
             cfg.setTrainingDir(tfTraining.getText());
             cfg.setValidatorName(tfValidator.getText());
+            cfg.setLicensePath(tfLicense.getText());
             cfg.save();
             dlg.close();
         });
@@ -139,6 +223,9 @@ public class QTraceSettingsDialog {
             sep,
             sectionTitle("Validator"),
             validatorGrid, validatorHint,
+            sep2,
+            sectionTitle("Enterprise License"),
+            licenseGrid,
             buttonRow);
         VBox.setMargin(hint,          new Insets(0, 20, 8, 20));
         VBox.setMargin(validatorHint, new Insets(0, 20, 8, 20));
@@ -229,5 +316,40 @@ public class QTraceSettingsDialog {
         Region r = new Region();
         HBox.setHgrow(r, Priority.ALWAYS);
         return r;
+    }
+
+    private static void updateLicenseStatus(Label statusLbl, String path, TextField tfValidator) {
+        if (path == null || path.isBlank()) {
+            statusLbl.setText("No license loaded.");
+            statusLbl.setTextFill(Color.web(TEXT_MUTED));
+            return;
+        }
+        try {
+            QTracePlugin enterprise = QTracePluginManager.get();
+            if (enterprise == null) {
+                statusLbl.setText("Enterprise plugin not installed.");
+                statusLbl.setTextFill(Color.web(ORANGE));
+                return;
+            }
+            String token = java.nio.file.Files.readString(java.nio.file.Path.of(path)).strip();
+            io.astraebio.qtrace.LicenseInfo info = enterprise.validateLicense(token);
+            if (info == null) {
+                statusLbl.setText("Invalid or corrupted license file.");
+                statusLbl.setTextFill(Color.web(RED));
+                return;
+            }
+            if (info.expired()) {
+                statusLbl.setText("License expired — download a new one from " + PORTAL_URL);
+                statusLbl.setTextFill(Color.web(ORANGE));
+                return;
+            }
+            statusLbl.setText("✓ Verified — " + info.name() + " · " + info.institution()
+                + " · valid until " + info.expiresAtFormatted());
+            statusLbl.setTextFill(Color.web(GREEN));
+            if (tfValidator.getText().isBlank()) tfValidator.setText(info.name());
+        } catch (Exception ex) {
+            statusLbl.setText("Could not read license file.");
+            statusLbl.setTextFill(Color.web(RED));
+        }
     }
 }
