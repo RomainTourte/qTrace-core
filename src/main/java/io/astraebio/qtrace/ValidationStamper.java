@@ -120,9 +120,22 @@ public class ValidationStamper {
 
         int row = 0;
         Label validatorLabel = activeLicense != null
-            ? styledLabel("Validator  ✓", "#a6e3a1")   // green certified
+            ? styledLabel("Validator  ✓", "#a6e3a1")
             : new Label("Validator *");
         grid.add(validatorLabel, 0, row); grid.add(validatorField, 1, row++);
+
+        // Public key row — only when certified
+        if (activeLicense != null && !activeLicense.validatorKey().isBlank()) {
+            Label vkLabel = styledLabel("Validator Key", "#6c7086");
+            Label vkValue = new Label(activeLicense.validatorKeyShort());
+            vkValue.setFont(javafx.scene.text.Font.font("Monospaced", 11));
+            vkValue.setStyle("-fx-text-fill: #6c7086;");
+            vkValue.setTooltip(new javafx.scene.control.Tooltip(
+                "ED25519 public key (full):\n" + activeLicense.validatorKey()
+              + "\n\nThis key uniquely identifies you as a certified qTrace validator.\n"
+              + "It will be used for cryptographic stamp signing and blockchain anchoring."));
+            grid.add(vkLabel, 0, row); grid.add(vkValue, 1, row++);
+        }
         grid.add(new Label("Scope"),              0, row); grid.add(scopeBox,       1, row++);
         grid.add(new Label("Confidence"),         0, row); grid.add(confidenceBox,  1, row++);
         grid.add(new Label("Notes"),              0, row); grid.add(notesArea,      1, row++);
