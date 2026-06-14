@@ -46,7 +46,17 @@ public final class StampSigner {
                     sig.update(stamp.canonicalPayload().getBytes(StandardCharsets.UTF_8));
                     return Base64.getUrlEncoder().withoutPadding().encodeToString(sig.sign());
                 } catch (Exception e) {
-                    System.err.println("[qTrace] StampSigner: in-memory key sign failed — " + e.getMessage());
+                    String msg = e.getClass().getSimpleName() + ": " + e.getMessage();
+                    System.err.println("[qTrace] StampSigner: in-memory key sign failed — " + msg);
+                    javafx.application.Platform.runLater(() -> {
+                        javafx.scene.control.Alert a = new javafx.scene.control.Alert(
+                            javafx.scene.control.Alert.AlertType.ERROR);
+                        a.setTitle("qTrace — Signing error");
+                        a.setHeaderText("Could not sign stamp with decrypted key");
+                        a.setContentText(msg);
+                        a.showAndWait();
+                    });
+                    return null;
                 }
             } else if (ep.hasEncryptedSigningKey()) {
                 System.err.println("[qTrace] StampSigner: passphrase not entered yet — stamp unsigned");

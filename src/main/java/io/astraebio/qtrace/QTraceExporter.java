@@ -191,6 +191,8 @@ public class QTraceExporter {
             val.addProperty("confidence",          stamp.confidence());
             val.addProperty("notes",               stamp.notes());
             val.addProperty("classifier_fidelity", stamp.classifierFidelity());
+            if (stamp.signature()      != null) val.addProperty("signature",       stamp.signature());
+            if (stamp.validatorKeyPub() != null) val.addProperty("validatorKeyPub", stamp.validatorKeyPub());
             session.add("validation", val);
         } else {
             session.add("validation", JsonNull.INSTANCE);
