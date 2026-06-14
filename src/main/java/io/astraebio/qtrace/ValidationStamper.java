@@ -156,13 +156,18 @@ public class ValidationStamper {
         }
 
         // ── Result converter ─────────────────────────────────────────────────
+        // Capture license info for signing (evaluated once, used in converter)
+        final LicenseInfo licenseForSign = activeLicense;
+
         dialog.setResultConverter(btn -> {
             if (btn != ButtonType.OK) return null;
             String sel = statusBox.getValue();
             int idx = 1;
             for (int i = 0; i < STATUS_LABELS.length; i++)
                 if (STATUS_LABELS[i].equals(sel)) { idx = i; break; }
-            return new ValidationStamp(
+
+            // Build unsigned stamp first (signature field requires the timestamp to be fixed)
+            ValidationStamp unsigned = new ValidationStamp(
                 validatorField.getText().trim(),
                 Instant.now(),
                 scopeBox.getValue(),
@@ -172,7 +177,31 @@ public class ValidationStamper {
                 imgHash,
                 fidelity.name(),
                 idx,
-                sel
+                sel,
+                null,  // signature — filled below
+                licenseForSign != null ? licenseForSign.validatorKey() : null
+            );
+
+            // If Enterprise license has an encrypted signing key and it is not yet decrypted,
+            // prompt the user for their passphrase before attempting to sign.
+            QTracePlugin epSign = QTracePluginManager.get();
+            if (epSign != null && epSign.hasEncryptedSigningKey() && epSign.getDecryptedSigningKey() == null) {
+                epSign.promptPassphraseAndDecrypt(owner);
+            }
+
+            // Sign if a key is available
+            String sig = StampSigner.sign(unsigned);
+
+            if (sig == null) return unsigned; // no key configured — stamp is unsigned
+
+            // Return stamped copy with signature attached
+            return new ValidationStamp(
+                unsigned.validator(), unsigned.timestamp(),
+                unsigned.scope(), unsigned.confidence(), unsigned.notes(),
+                unsigned.gitHash(), unsigned.imageHash(), unsigned.classifierFidelity(),
+                unsigned.statusIndex(), unsigned.statusLabel(),
+                sig,
+                unsigned.validatorKeyPub()
             );
         });
 

@@ -1,0 +1,116 @@
+package io.astraebio.qtrace;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
+
+/**
+ * Phase 19 — Signs a ValidationStamp payload with the validator's ED25519 private key.
+ *
+ * Key file format (downloaded from qtrace.ca):
+ *   -----BEGIN QTRACE SIGNING KEY-----
+ *   <base64url of PKCS8 DER-encoded ED25519 private key>
+ *   -----END QTRACE SIGNING KEY-----
+ *
+ * Default location: ~/.qTrace/qtrace-signing.key
+ * Configurable via QTraceConfig.getSigningKeyPath().
+ */
+public final class StampSigner {
+
+    private StampSigner() {}
+
+    /**
+     * Signs the stamp's canonical payload and returns the signature as base64url.
+     * Priority:
+     *   1. In-memory decrypted key from Enterprise plugin (passphrase-unlocked).
+     *   2. Key file on disk (legacy path via QTraceConfig / ~/.qTrace/qtrace-signing.key).
+     * Returns null silently if no signing key is available.
+     */
+    public static String sign(ValidationStamp stamp) {
+        // 1. Try in-memory decrypted key (Enterprise, passphrase-protected .qtlicense)
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep != null) {
+            String decryptedKey = ep.getDecryptedSigningKey();
+            if (decryptedKey != null) {
+                try {
+                    byte[] derBytes = Base64.getUrlDecoder().decode(decryptedKey);
+                    PrivateKey privateKey = KeyFactory.getInstance("Ed25519")
+                        .generatePrivate(new PKCS8EncodedKeySpec(derBytes));
+                    Signature sig = Signature.getInstance("Ed25519");
+                    sig.initSign(privateKey);
+                    sig.update(stamp.canonicalPayload().getBytes(StandardCharsets.UTF_8));
+                    return Base64.getUrlEncoder().withoutPadding().encodeToString(sig.sign());
+                } catch (Exception e) {
+                    System.err.println("[qTrace] StampSigner: in-memory key sign failed — " + e.getMessage());
+                }
+            } else if (ep.hasEncryptedSigningKey()) {
+                System.err.println("[qTrace] StampSigner: passphrase not entered yet — stamp unsigned");
+                return null;
+            }
+        }
+
+        // 2. Fallback: key file on disk
+        Path keyPath = resolveKeyPath();
+        if (keyPath == null || !Files.exists(keyPath)) return null;
+
+        try {
+            byte[] derBytes = loadDer(keyPath);
+            PrivateKey privateKey = KeyFactory.getInstance("Ed25519")
+                .generatePrivate(new PKCS8EncodedKeySpec(derBytes));
+
+            Signature sig = Signature.getInstance("Ed25519");
+            sig.initSign(privateKey);
+            sig.update(stamp.canonicalPayload().getBytes(StandardCharsets.UTF_8));
+
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(sig.sign());
+        } catch (Exception e) {
+            System.err.println("[qTrace] StampSigner: could not sign stamp — " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Verifies a signature against the canonical payload and the given base64url public key (SPKI-DER).
+     * Returns false on any error.
+     */
+    public static boolean verify(ValidationStamp stamp, String pubKeyBase64url, String signatureBase64url) {
+        if (pubKeyBase64url == null || signatureBase64url == null) return false;
+        try {
+            byte[] spkiDer = Base64.getUrlDecoder().decode(pubKeyBase64url);
+            java.security.spec.X509EncodedKeySpec spec = new java.security.spec.X509EncodedKeySpec(spkiDer);
+            java.security.PublicKey publicKey = KeyFactory.getInstance("Ed25519").generatePublic(spec);
+
+            Signature sig = Signature.getInstance("Ed25519");
+            sig.initVerify(publicKey);
+            sig.update(stamp.canonicalPayload().getBytes(StandardCharsets.UTF_8));
+
+            byte[] sigBytes = Base64.getUrlDecoder().decode(signatureBase64url);
+            return sig.verify(sigBytes);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private static Path resolveKeyPath() {
+        String configured = QTraceConfig.get().getSigningKeyPath();
+        if (!configured.isBlank()) return Path.of(configured);
+        return Path.of(System.getProperty("user.home"), ".qTrace", "qtrace-signing.key");
+    }
+
+    /** Parses the PEM-like wrapper and decodes the inner base64url content. */
+    private static byte[] loadDer(Path keyPath) throws Exception {
+        String content = Files.readString(keyPath).strip();
+        String b64 = content
+            .replace("-----BEGIN QTRACE SIGNING KEY-----", "")
+            .replace("-----END QTRACE SIGNING KEY-----",   "")
+            .replaceAll("\\s+", "");
+        return Base64.getUrlDecoder().decode(b64);
+    }
+}

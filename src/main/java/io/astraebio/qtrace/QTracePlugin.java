@@ -35,4 +35,19 @@ public interface QTracePlugin {
      * Default: always authorized (no PIN without Enterprise).
      */
     default boolean requirePinToStamp(javafx.stage.Window owner) { return true; }
+
+    /**
+     * Returns true if the loaded .qtlicense contains an encrypted signing key.
+     */
+    default boolean hasEncryptedSigningKey() { return false; }
+
+    /**
+     * Shows a passphrase dialog, decrypts the signing key, and stores it in-memory for this session.
+     */
+    default void promptPassphraseAndDecrypt(javafx.stage.Stage owner) {}
+
+    /**
+     * Returns the decrypted ED25519 private key (base64url PKCS8-DER), or null if not yet decrypted.
+     */
+    default String getDecryptedSigningKey() { return null; }
 }
