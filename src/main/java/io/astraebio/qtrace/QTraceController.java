@@ -344,8 +344,6 @@ public class QTraceController {
             return;
         }
         logger.refreshAllAnnotationCaptures();
-        QTracePlugin enterprise = QTracePluginManager.get();
-        if (enterprise != null && !enterprise.requirePinToStamp(qupath.getStage())) return;
         String currentStatus = readCurrentStatus();
         ValidationStamper.show(qupath.getStage(), null, logger.getImageHash(),
                                logger.computeClassifierFidelity(), currentStatus)
@@ -441,7 +439,8 @@ public class QTraceController {
         String hash = logger.getImageHash();
         lastStamp = new ValidationStamp(
             validator, java.time.Instant.now(), scope, confidence, notes,
-            null, hash, logger.computeClassifierFidelity().name(), 1, "1-In Progress");
+            null, hash, logger.computeClassifierFidelity().name(), 1, "1-In Progress",
+            null, null);  // signature + validatorKeyPub: unsigned (batch path, no dialog)
 
         Path exportDir = QTraceConfig.get().getExportDir();
         var  exporter  = new QTraceExporter(logger, null, lastStamp);

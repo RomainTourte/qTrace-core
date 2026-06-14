@@ -192,12 +192,7 @@ public class QTraceAboutDialog {
         expLbl.setTextFill(Color.web(TEXT_MUTED));
         expLbl.setFont(Font.font("System", 11));
 
-        boolean pinSet = QTraceConfig.get().hasPinSet();
-        Label pinLbl = new Label(pinSet ? "●●●●  PIN set" : "No PIN");
-        pinLbl.setTextFill(Color.web(pinSet ? GREEN : ORANGE));
-        pinLbl.setFont(Font.font("System", FontWeight.BOLD, 11));
-
-        metaRow.getChildren().addAll(expLbl, pinLbl);
+        metaRow.getChildren().add(expLbl);
 
         inner.getChildren().add(titleLbl);
         inner.getChildren().add(nameLbl);
@@ -278,7 +273,6 @@ public class QTraceAboutDialog {
         String[] certified = {
             "Identity-certified stamps",
             "Validator name locked in stamp",
-            "License PIN protection",
         };
         for (String feat : certified) {
             boolean dimmed = mode != Mode.CERTIFIED;

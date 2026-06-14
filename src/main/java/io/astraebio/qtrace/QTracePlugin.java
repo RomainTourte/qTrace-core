@@ -30,13 +30,6 @@ public interface QTracePlugin {
     default LicenseInfo getActiveLicenseInfo() { return null; }
 
     /**
-     * Called before any stamp is recorded. Returns true if the user is authorized to stamp
-     * (PIN verified, or no PIN set). Returns false if the user cancelled or entered a wrong PIN.
-     * Default: always authorized (no PIN without Enterprise).
-     */
-    default boolean requirePinToStamp(javafx.stage.Window owner) { return true; }
-
-    /**
      * Returns true if the loaded .qtlicense contains an encrypted signing key.
      */
     default boolean hasEncryptedSigningKey() { return false; }
