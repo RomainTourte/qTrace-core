@@ -39,10 +39,16 @@ public class ValidationStamper {
         dialog.setTitle("QTrace — Expert Validation");
         dialog.setHeaderText("Validate this workflow capture");
 
+        // ── Passphrase unlock (before any dialog) ────────────────────────────
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep != null && ep.hasEncryptedSigningKey() && ep.getDecryptedSigningKey() == null) {
+            ep.promptPassphraseAndDecrypt(owner);
+            if (ep.getDecryptedSigningKey() == null) return Optional.empty(); // cancelled or wrong passphrase
+        }
+
         // ── Form fields ──────────────────────────────────────────────────────
         // If Enterprise + valid license: identity is locked to the license holder
         LicenseInfo activeLicense = null;
-        QTracePlugin ep = QTracePluginManager.get();
         if (ep != null) activeLicense = ep.getActiveLicenseInfo();
 
         String configuredValidator = (activeLicense != null)
@@ -181,13 +187,6 @@ public class ValidationStamper {
                 null,  // signature — filled below
                 licenseForSign != null ? licenseForSign.validatorKey() : null
             );
-
-            // If Enterprise license has an encrypted signing key and it is not yet decrypted,
-            // prompt the user for their passphrase before attempting to sign.
-            QTracePlugin epSign = QTracePluginManager.get();
-            if (epSign != null && epSign.hasEncryptedSigningKey() && epSign.getDecryptedSigningKey() == null) {
-                epSign.promptPassphraseAndDecrypt(owner);
-            }
 
             // Sign if a key is available
             String sig = StampSigner.sign(unsigned);
