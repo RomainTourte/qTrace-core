@@ -914,38 +914,39 @@ public class QTraceDashboard {
         JsonArray sessions = (root != null && root.has("sessions") && !root.get("sessions").isJsonNull())
             ? root.getAsJsonArray("sessions") : new JsonArray();
 
-        // Collect validated sessions (chronological)
-        List<JsonObject> validated = new ArrayList<>();
+        // Collect validated sessions (chronological) — keep full session object for context
+        List<JsonObject> validatedSessions = new ArrayList<>();
         for (int i = 0; i < sessions.size(); i++) {
-            JsonObject s   = sessions.get(i).getAsJsonObject();
-            JsonObject val = s.has("validation") && !s.get("validation").isJsonNull()
-                ? s.getAsJsonObject("validation") : null;
-            if (val != null) validated.add(val);
+            JsonObject s = sessions.get(i).getAsJsonObject();
+            if (s.has("validation") && !s.get("validation").isJsonNull())
+                validatedSessions.add(s);
         }
 
-        if (validated.isEmpty()) {
+        if (validatedSessions.isEmpty()) {
             imageCardContent.getChildren().add(
                 lbl("Not validated", TEXT_MUTED, 11, FontWeight.NORMAL, true));
             return;
         }
 
         // Latest validation always visible
-        JsonObject latest = validated.get(validated.size() - 1);
-        imageCardContent.getChildren().add(buildValidationRow(latest));
+        JsonObject latestSession = validatedSessions.get(validatedSessions.size() - 1);
+        imageCardContent.getChildren().add(
+            buildValidationRow(latestSession.getAsJsonObject("validation"), root, true));
 
-        if (validated.size() <= 1) return;
+        if (validatedSessions.size() <= 1) return;
 
         // History panel (collapsed by default)
         VBox historyBox = new VBox(4);
         historyBox.setVisible(false);
         historyBox.setManaged(false);
-        for (int i = validated.size() - 2; i >= 0; i--) {
-            if (i < validated.size() - 2) historyBox.getChildren().add(sep());
-            historyBox.getChildren().add(buildValidationRow(validated.get(i)));
+        for (int i = validatedSessions.size() - 2; i >= 0; i--) {
+            if (i < validatedSessions.size() - 2) historyBox.getChildren().add(sep());
+            historyBox.getChildren().add(
+                buildValidationRow(validatedSessions.get(i).getAsJsonObject("validation"), root, false));
         }
 
         // Toggle button
-        Button toggleBtn = new Button("▼  " + (validated.size() - 1) + " previous contributor(s)");
+        Button toggleBtn = new Button("▼  " + (validatedSessions.size() - 1) + " previous contributor(s)");
         toggleBtn.setStyle(
             "-fx-background-color: transparent; -fx-border-color: " + BORDER + ";" +
             "-fx-border-radius: 4; -fx-text-fill: " + BLUE + "; -fx-font-size: 11px;" +
@@ -956,13 +957,13 @@ public class QTraceDashboard {
             historyBox.setManaged(nowVisible);
             toggleBtn.setText(nowVisible
                 ? "▲  Hide history"
-                : "▼  " + (validated.size() - 1) + " previous contributor(s)");
+                : "▼  " + (validatedSessions.size() - 1) + " previous contributor(s)");
         });
 
         imageCardContent.getChildren().addAll(toggleBtn, historyBox);
     }
 
-    private VBox buildValidationRow(JsonObject val) {
+    private VBox buildValidationRow(JsonObject val, JsonObject root, boolean isLatest) {
         String validator  = str(val, "validator",           "?");
         String timestamp  = str(val, "timestamp",           "");
         String scope      = str(val, "scope",               "");
@@ -991,6 +992,42 @@ public class QTraceDashboard {
 
         if (!notes.isBlank())
             box.getChildren().add(lbl("Notes : \"" + notes + "\"", TEXT_MUTED, 11, FontWeight.NORMAL, true));
+
+        // ── Signature verification (Phase 19.6) ──────────────────────────────
+        String signature    = str(val, "signature",       "");
+        String validatorKey = str(val, "validatorKeyPub", "");
+        if (!signature.isEmpty() && !validatorKey.isEmpty()) {
+            // Reconstruct canonical payload — mirrors ValidationStamp.canonicalPayload()
+            String imageHash   = str(val, "imageHash",   "");
+            String statusLabel = str(val, "statusLabel", "");
+
+            // Fallbacks for stamps generated before Phase 19.6
+            if (imageHash.isEmpty() && root != null) {
+                JsonObject img = jsonObj(root, "image");
+                if (img != null) imageHash = str(img, "sha256", "");
+            }
+            if (statusLabel.isEmpty() && isLatest && root != null)
+                statusLabel = str(root, "status", "");
+
+            String payload = "validator=" + validator
+                + "\nscope="      + scope
+                + "\nconfidence=" + confidence
+                + "\nstatus="     + statusLabel
+                + "\ngitHash="    // always empty — UI stamps pass null gitHash
+                + "\nimageHash="  + imageHash
+                + "\ntimestamp="  + timestamp;
+
+            boolean valid = StampSigner.verify(payload, validatorKey, signature);
+            String badgeText  = valid ? "🔐  Signature ED25519 ✓" : "⚠  Signature invalide";
+            String badgeColor = valid ? GREEN : RED;
+            Label badge = lbl(badgeText, badgeColor, 11, FontWeight.BOLD, false);
+            String vkShort = validatorKey.length() > 20
+                ? validatorKey.substring(0, 20) + "…" : validatorKey;
+            badge.setTooltip(new Tooltip(valid
+                ? "Signature ED25519 valide.\nClé publique : " + vkShort
+                : "Signature invalide — le fichier a peut-être été modifié après le stamp."));
+            box.getChildren().add(badge);
+        }
 
         return box;
     }

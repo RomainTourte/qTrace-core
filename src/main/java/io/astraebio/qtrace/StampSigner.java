@@ -90,16 +90,25 @@ public final class StampSigner {
      */
     public static boolean verify(ValidationStamp stamp, String pubKeyBase64url, String signatureBase64url) {
         if (pubKeyBase64url == null || signatureBase64url == null) return false;
+        return verify(stamp.canonicalPayload(), pubKeyBase64url, signatureBase64url);
+    }
+
+    /**
+     * Verifies a base64url ED25519 signature against a pre-computed canonical payload string.
+     * Used by the Dashboard to verify stamps without reconstructing a full ValidationStamp.
+     */
+    public static boolean verify(String canonicalPayload, String pubKeyBase64url, String signatureBase64url) {
+        if (canonicalPayload == null || pubKeyBase64url == null || signatureBase64url == null) return false;
         try {
-            byte[] spkiDer = Base64.getUrlDecoder().decode(pubKeyBase64url);
+            byte[] spkiDer  = Base64.getUrlDecoder().decode(pubKeyBase64url);
+            byte[] sigBytes = Base64.getUrlDecoder().decode(signatureBase64url);
             java.security.spec.X509EncodedKeySpec spec = new java.security.spec.X509EncodedKeySpec(spkiDer);
             java.security.PublicKey publicKey = KeyFactory.getInstance("Ed25519").generatePublic(spec);
 
             Signature sig = Signature.getInstance("Ed25519");
             sig.initVerify(publicKey);
-            sig.update(stamp.canonicalPayload().getBytes(StandardCharsets.UTF_8));
+            sig.update(canonicalPayload.getBytes(StandardCharsets.UTF_8));
 
-            byte[] sigBytes = Base64.getUrlDecoder().decode(signatureBase64url);
             return sig.verify(sigBytes);
         } catch (Exception e) {
             return false;
