@@ -102,9 +102,12 @@ public class ValidationStamper {
         notesArea.setPrefRowCount(3);
         notesArea.setWrapText(true);
 
-        CheckBox attestationBox = new CheckBox(ValidationStamp.SIGNING_MEANING);
-        attestationBox.setWrapText(true);
-        attestationBox.setMaxWidth(360);
+        // Attestation checkbox only shown when Enterprise is present (signing has legal meaning)
+        CheckBox attestationBox = ep != null ? new CheckBox(ValidationStamp.SIGNING_MEANING) : null;
+        if (attestationBox != null) {
+            attestationBox.setWrapText(true);
+            attestationBox.setMaxWidth(360);
+        }
 
         ComboBox<String> statusBox = new ComboBox<>(
             FXCollections.observableArrayList(STATUS_LABELS));
@@ -158,7 +161,9 @@ public class ValidationStamper {
         grid.add(new Label("Scope"),              0, row); grid.add(scopeBox,       1, row++);
         grid.add(new Label("Confidence"),         0, row); grid.add(confidenceBox,  1, row++);
         grid.add(new Label("Notes"),              0, row); grid.add(notesArea,      1, row++);
-        grid.add(new Label("Attestation *"),      0, row); grid.add(attestationBox, 1, row++);
+        if (attestationBox != null) {
+            grid.add(new Label("Attestation *"),  0, row); grid.add(attestationBox, 1, row++);
+        }
         grid.add(new Label("Workflow status"),    0, row); grid.add(statusBox,      1, row++);
         grid.add(new Label("Git hash"),           0, row); grid.add(gitLabel,       1, row++);
         grid.add(new Label("Image SHA-256"),      0, row); grid.add(imgLabel,       1, row++);
@@ -167,14 +172,19 @@ public class ValidationStamper {
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
-        // Disable OK until validator name entered AND attestation checked (21 CFR §11.50)
+        // Enterprise: OK blocked until validator named AND attestation checked (21 CFR §11.50)
+        // Core: OK blocked only until validator name entered (no cryptographic signing)
         Node okBtn = dialog.getDialogPane().lookupButton(ButtonType.OK);
-        Runnable updateOk = () ->
-            okBtn.setDisable(validatorField.getText().trim().isEmpty() || !attestationBox.isSelected());
+        Runnable updateOk = () -> okBtn.setDisable(
+            validatorField.getText().trim().isEmpty()
+            || (attestationBox != null && !attestationBox.isSelected())
+        );
         if (activeLicense == null) {
             validatorField.textProperty().addListener((obs, o, n) -> updateOk.run());
         }
-        attestationBox.selectedProperty().addListener((obs, o, n) -> updateOk.run());
+        if (attestationBox != null) {
+            attestationBox.selectedProperty().addListener((obs, o, n) -> updateOk.run());
+        }
         updateOk.run();
 
         // ── Result converter ─────────────────────────────────────────────────
