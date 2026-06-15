@@ -29,6 +29,7 @@ public record ValidationStamp(
     String  gitHash,
     String  imageHash,
     String  qpdataSha256,       // SHA-256 of .qpdata at stamp time — binds cert to data state
+    String  caseId,             // case identifier, pre-filled from project name
     String  classifierFidelity, // ClassifierFidelity.name() — HIGH / DEGRADED / COMPROMISED
     int     statusIndex,        // 0=To Begin, 1=In Progress, 2=Finished
     String  statusLabel,        // "0-To Begin" / "1-In Progress" / "2-Finished"

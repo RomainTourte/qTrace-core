@@ -12,6 +12,7 @@ import qupath.lib.images.ImageData;
 import qupath.lib.objects.PathObject;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import qupath.lib.projects.ProjectImageEntry;
@@ -346,8 +347,9 @@ public class QTraceController {
         logger.refreshAllAnnotationCaptures();
         String currentStatus = readCurrentStatus();
         String qpdataHash = resolveQpdataHash();
+        String defaultCaseId = resolveDefaultCaseId();
         ValidationStamper.show(qupath.getStage(), null, logger.getImageHash(), qpdataHash,
-                               logger.computeClassifierFidelity(), currentStatus)
+                               logger.computeClassifierFidelity(), currentStatus, defaultCaseId)
             .ifPresentOrElse(
                 stamp -> {
                     lastStamp = stamp;
@@ -392,6 +394,14 @@ public class QTraceController {
         return null;
     }
 
+    private String resolveDefaultCaseId() {
+        try {
+            var project = qupath.getProject();
+            if (project != null && project.getName() != null) return project.getName();
+        } catch (Exception ignored) {}
+        return "";
+    }
+
     private String readCurrentStatus() {
         try {
             var imageData = logger.getCurrentImageData();
@@ -420,6 +430,22 @@ public class QTraceController {
                 panel.log(".qtrace written:");
                 panel.log("  " + outFile.getFileName());
                 panel.log("  CSV: " + csvFile.getFileName());
+            }
+
+            // Enterprise: build .qtcert chain-of-custody certificate
+            QTracePlugin ep = QTracePluginManager.get();
+            if (ep != null && lastStamp != null) {
+                try {
+                    JsonObject qtroot = JsonParser.parseString(Files.readString(outFile)).getAsJsonObject();
+                    JsonArray sessions = qtroot.getAsJsonArray("sessions");
+                    JsonObject lastSession = sessions.get(sessions.size() - 1).getAsJsonObject();
+                    JsonObject imageRoot = qtroot.getAsJsonObject("image");
+                    Path certPath = ep.buildCertificate(lastStamp, lastSession, imageRoot, outDir);
+                    if (certPath != null && panel != null)
+                        panel.log("  .qtcert: " + certPath.getFileName());
+                } catch (Exception e) {
+                    if (panel != null) panel.log("  .qtcert: " + e.getMessage());
+                }
             }
         } catch (Exception e) {
             if (panel != null) panel.log("Export error: " + e.getMessage());
@@ -467,6 +493,7 @@ public class QTraceController {
         lastStamp = new ValidationStamp(
             validator, java.time.Instant.now(), scope, confidence, notes,
             null, hash, null,  // qpdataSha256: null on batch path (no QuPath project context)
+            resolveDefaultCaseId(),
             logger.computeClassifierFidelity().name(), 1, "1-In Progress",
             null, null);  // signature + validatorKeyPub: unsigned (batch path, no dialog)
 

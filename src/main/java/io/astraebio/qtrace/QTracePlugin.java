@@ -1,6 +1,9 @@
 package io.astraebio.qtrace;
 
+import com.google.gson.JsonObject;
 import qupath.lib.gui.QuPathGUI;
+
+import java.nio.file.Path;
 
 /**
  * Service interface implemented by the Enterprise module.
@@ -43,4 +46,11 @@ public interface QTracePlugin {
      * Returns the decrypted ED25519 private key (base64url PKCS8-DER), or null if not yet decrypted.
      */
     default String getDecryptedSigningKey() { return null; }
+
+    /**
+     * Builds a .qtcert certificate and appends to chain.jsonl.
+     * Returns the path to the written .qtcert, or null if not supported / no key available.
+     */
+    default Path buildCertificate(ValidationStamp stamp, JsonObject sessionPayload,
+                                   JsonObject imageRoot, Path exportDir) { return null; }
 }

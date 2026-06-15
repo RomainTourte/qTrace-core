@@ -34,7 +34,8 @@ public class ValidationStamper {
     public static Optional<ValidationStamp> show(Stage owner, String gitHash, String imgHash,
                                                   String qpdataHash,
                                                   ClassifierFidelity fidelity,
-                                                  String currentStatusLabel) {
+                                                  String currentStatusLabel,
+                                                  String defaultCaseId) {
         Dialog<ValidationStamp> dialog = new Dialog<>();
         dialog.initOwner(owner);
         dialog.setTitle("QTrace — Expert Validation");
@@ -74,6 +75,12 @@ public class ValidationStamper {
               + "Valid until: " + activeLicense.expiresAtFormatted()
             ));
         }
+
+        TextField caseIdField = new TextField(defaultCaseId != null ? defaultCaseId : "");
+        caseIdField.setPromptText("Case identifier (e.g. project name)");
+        caseIdField.setPrefWidth(280);
+        caseIdField.setTooltip(new javafx.scene.control.Tooltip(
+            "Identifier for this case — pre-filled from project name, editable"));
 
         ComboBox<String> scopeBox = new ComboBox<>(FXCollections.observableArrayList(
             "Full Workflow",
@@ -147,6 +154,7 @@ public class ValidationStamper {
               + "It will be used for cryptographic stamp signing and blockchain anchoring."));
             grid.add(vkLabel, 0, row); grid.add(vkValue, 1, row++);
         }
+        grid.add(new Label("Case ID"),            0, row); grid.add(caseIdField,    1, row++);
         grid.add(new Label("Scope"),              0, row); grid.add(scopeBox,       1, row++);
         grid.add(new Label("Confidence"),         0, row); grid.add(confidenceBox,  1, row++);
         grid.add(new Label("Notes"),              0, row); grid.add(notesArea,      1, row++);
@@ -190,6 +198,7 @@ public class ValidationStamper {
                 gitHash,
                 imgHash,
                 qpdataHash,
+                caseIdField.getText().trim(),
                 fidelity.name(),
                 idx,
                 sel,
@@ -207,6 +216,7 @@ public class ValidationStamper {
                 unsigned.validator(), unsigned.timestamp(),
                 unsigned.scope(), unsigned.confidence(), unsigned.notes(),
                 unsigned.gitHash(), unsigned.imageHash(), unsigned.qpdataSha256(),
+                unsigned.caseId(),
                 unsigned.classifierFidelity(),
                 unsigned.statusIndex(), unsigned.statusLabel(),
                 sig,
