@@ -147,7 +147,7 @@ public class QTraceAboutDialog {
         nameRow.setAlignment(Pos.CENTER);
         nameRow.getChildren().addAll(name, badge);
 
-        Label version = new Label("v" + QTraceController.VERSION);
+        Label version = new Label("v" + QTraceController.getDisplayVersion());
         version.setTextFill(Color.web(TEXT_MUTED));
         version.setFont(Font.font("System", 11));
 

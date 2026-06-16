@@ -27,6 +27,9 @@ public interface QTracePlugin {
      * Returns a decoded {@link LicenseInfo} if the signature is valid and the token is not expired,
      * or null if the token is invalid.
      */
+    /** Returns the Enterprise plugin version string, e.g. "1.0.2". */
+    default String getPluginVersion() { return null; }
+
     default LicenseInfo validateLicense(String token) { return null; }
 
     /**

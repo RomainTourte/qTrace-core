@@ -101,7 +101,7 @@ public class QTracePanel {
         title.setFont(Font.font("System", FontWeight.BOLD, 18));
         title.setFill(Color.web(TEXT_MAIN));
 
-        Text sub = new Text("Workflow Provenance — v" + QTraceController.VERSION);
+        Text sub = new Text("Workflow Provenance — v" + QTraceController.getDisplayVersion());
         sub.setFont(Font.font("System", 11));
         sub.setFill(Color.web(TEXT_MUTED));
 

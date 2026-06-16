@@ -41,9 +41,23 @@ public class QTraceController {
 
     static final String VERSION = "1.0.1";
 
+    public static String getDisplayVersion() {
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep != null) {
+            String epv = ep.getPluginVersion();
+            if (epv != null) return epv;
+        }
+        return VERSION;
+    }
+
     public static String getEditionLabel() {
-        String edition = QTracePluginManager.hasEnterprise() ? "Enterprise" : "Core";
-        return "qTrace " + edition + "  v" + VERSION;
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep != null) {
+            String epVersion = ep.getPluginVersion();
+            String v = epVersion != null ? epVersion : VERSION;
+            return "qTrace Enterprise  v" + v;
+        }
+        return "qTrace Core  v" + VERSION;
     }
 
     private final QuPathGUI qupath;
@@ -476,12 +490,17 @@ public class QTraceController {
             if (panel != null) panel.log("☁ chain.jsonl not found.");
             return;
         }
+        java.util.Collection<ClassifierRecord> classifiers = logger.getKnownClassifiers().values();
         if (panel != null) {
             panel.log("☁ Pushing to workspace…");
+            panel.log("  · " + lastQtracePath.getFileName());
+            panel.log("  · " + lastCertPath.getFileName());
+            panel.log("  · chain.jsonl");
+            for (ClassifierRecord clf : classifiers)
+                panel.log("  · classifiers/" + clf.name + ".json");
             panel.setPushEnabled(false);
         }
-        ep.pushToWorkspace(lastStamp, lastCertPath, chainLog, lastQtracePath,
-                logger.getKnownClassifiers().values())
+        ep.pushToWorkspace(lastStamp, lastCertPath, chainLog, lastQtracePath, classifiers)
           .thenAccept(url -> {
               if (url != null && !url.startsWith("ERROR:")) {
                   if (panel != null) panel.log("☁ " + url);
