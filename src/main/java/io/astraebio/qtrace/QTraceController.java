@@ -293,19 +293,31 @@ public class QTraceController {
      * Opens QuPath's Script Editor (if not already open) and loads {@code script} into it.
      * Uses reflection to stay compatible across QuPath 0.5.1–0.7.x.
      */
+    /**
+     * Opens QuPath's Script Editor and pre-loads {@code script} into it.
+     * Inspection of DefaultScriptEditor (0.5.1) reveals:
+     *   showEditor()              — shows the editor Stage
+     *   getCurrentEditorControl() — returns the active ScriptEditorControl
+     *   ScriptEditorControl.setText(String) — sets the editor content
+     */
     public static void openInScriptEditor(QuPathGUI qupath, String script) {
         ScriptEditor se = qupath.getScriptEditor();
         if (se == null) return;
         try {
-            // Try getEditorComponent().setText() — QuPath 0.7.x DefaultScriptEditor
-            Object comp = invokeMethod(se, "getEditorComponent");
-            if (comp != null) {
+            // 1. Show the Script Editor window
+            invokeMethod(se, "showEditor");
+
+            // 2. Get the active editor control and set its text
+            Object ctrl = invokeMethod(se, "getCurrentEditorControl");
+            if (ctrl == null) ctrl = invokeMethod(se, "getEditorControl");
+            if (ctrl != null) {
                 try {
-                    comp.getClass().getMethod("setText", String.class).invoke(comp, script);
+                    ctrl.getClass().getMethod("setText", String.class).invoke(ctrl, script);
                     return;
                 } catch (Exception ignored) {}
             }
-            // Fallback: write to scriptText StringProperty directly
+
+            // Fallback: scriptText StringProperty
             Object raw = findField(se, "scriptText", Object.class);
             if (raw instanceof javafx.beans.property.StringProperty sp) {
                 sp.setValue(script);
