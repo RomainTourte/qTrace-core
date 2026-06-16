@@ -332,10 +332,6 @@ public class QTraceExporter {
             co.addProperty("tpc_file",                clf.tpcFilePath);
             co.addProperty("fidelity",                clf.fidelity().name());
             co.addProperty("modified_after_training", clf.modifiedAfterTraining);
-            try {
-                co.add("classifier_json",
-                    JsonParser.parseString(clf.jsonContent).getAsJsonObject());
-            } catch (Exception ignored) {}
             if (clf.appliedAtStepOrder >= 0) co.addProperty("applied_at_step", clf.appliedAtStepOrder);
             if (clf.objectsCreated     >= 0) co.addProperty("objects_created",  clf.objectsCreated);
             arr.add(co);

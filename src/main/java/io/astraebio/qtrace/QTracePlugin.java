@@ -4,6 +4,8 @@ import com.google.gson.JsonObject;
 import qupath.lib.gui.QuPathGUI;
 
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -56,12 +58,13 @@ public interface QTracePlugin {
                                    JsonObject imageRoot, Path exportDir) { return null; }
 
     /**
-     * Pushes a light bundle (.qtrace + .qtcert + chain.jsonl) to the user's qtrace.ca workspace.
+     * Pushes a bundle (.qtrace + .qtcert + chain.jsonl + classifiers) to the user's qtrace.ca workspace.
      * Returns a CompletableFuture resolving to the workspace URL, or null on failure / not supported.
      * Auth: reads the .qtlicense JWT from QTraceConfig and sends it as a bearer token.
      */
     default CompletableFuture<String> pushToWorkspace(
-            ValidationStamp stamp, Path certPath, Path chainLogPath, Path qtraceFile) {
+            ValidationStamp stamp, Path certPath, Path chainLogPath, Path qtraceFile,
+            Collection<ClassifierRecord> classifiers) {
         return CompletableFuture.completedFuture(null);
     }
 }

@@ -480,7 +480,8 @@ public class QTraceController {
             panel.log("☁ Pushing to workspace…");
             panel.setPushEnabled(false);
         }
-        ep.pushToWorkspace(lastStamp, lastCertPath, chainLog, lastQtracePath)
+        ep.pushToWorkspace(lastStamp, lastCertPath, chainLog, lastQtracePath,
+                logger.getKnownClassifiers().values())
           .thenAccept(url -> {
               if (url != null && !url.startsWith("ERROR:")) {
                   if (panel != null) panel.log("☁ " + url);
