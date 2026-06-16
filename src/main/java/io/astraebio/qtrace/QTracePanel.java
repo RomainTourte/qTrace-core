@@ -43,6 +43,8 @@ public class QTracePanel {
 
     // Record button (header)
     private Button   btnRecord;
+    // Cloud push button (Enterprise only)
+    private Button   btnPush;
 
     // Log
     private TextArea logArea;
@@ -198,7 +200,26 @@ public class QTracePanel {
         gear.setOnMouseExited(e  -> gear.setTextFill(Color.web(TEXT_MUTED)));
         gear.setOnAction(e -> QTraceSettingsDialog.show(stage));
 
-        header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, dashboard, batchBtn, reset, gear);
+        // Cloud workspace push — Enterprise only, disabled until a .qtcert has been written
+        if (QTracePluginManager.hasEnterprise()) {
+            btnPush = new Button("☁");
+            btnPush.setFont(Font.font("System", 14));
+            btnPush.setTextFill(Color.web(TEXT_MUTED));
+            btnPush.setTooltip(new Tooltip(
+                "Push to workspace — upload this certificate to your qtrace.ca workspace for Bitcoin anchoring"));
+            btnPush.setStyle(
+                "-fx-background-color: transparent;"
+              + "-fx-cursor: hand;"
+              + "-fx-padding: 0 4 0 4;"
+            );
+            btnPush.setDisable(true);
+            btnPush.setOnMouseEntered(e -> { if (!btnPush.isDisabled()) btnPush.setTextFill(Color.web(BLUE)); });
+            btnPush.setOnMouseExited(e  -> { if (!btnPush.isDisabled()) btnPush.setTextFill(Color.web(TEXT_MUTED)); });
+            btnPush.setOnAction(e -> controller.pushToWorkspace());
+            header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, btnPush, dashboard, batchBtn, reset, gear);
+        } else {
+            header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, dashboard, batchBtn, reset, gear);
+        }
         return header;
     }
 
@@ -387,6 +408,15 @@ public class QTracePanel {
         Platform.runLater(() -> {
             logArea.appendText(message + "\n");
             logArea.setScrollTop(Double.MAX_VALUE);
+        });
+    }
+
+    /** Enable/disable the ☁ push button (Enterprise only — no-op in Core). */
+    public void setPushEnabled(boolean enabled) {
+        if (btnPush == null) return;
+        Platform.runLater(() -> {
+            btnPush.setDisable(!enabled);
+            btnPush.setTextFill(Color.web(enabled ? BLUE : TEXT_MUTED));
         });
     }
 

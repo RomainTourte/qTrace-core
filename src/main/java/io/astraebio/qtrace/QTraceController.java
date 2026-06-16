@@ -57,7 +57,9 @@ public class QTraceController {
     private final List<String>        capturedOutput  = new CopyOnWriteArrayList<>();
 
     // Validation state
-    private ValidationStamp lastStamp = null;
+    private ValidationStamp lastStamp    = null;
+    private Path            lastCertPath  = null;  // written by exportReport(), used by pushToWorkspace()
+    private Path            lastQtracePath = null;
 
     // Recording state listeners (toolbar icon, etc.)
     private final List<Consumer<Boolean>> recordingListeners = new CopyOnWriteArrayList<>();
@@ -434,6 +436,8 @@ public class QTraceController {
 
             // Enterprise: build .qtcert chain-of-custody certificate
             QTracePlugin ep = QTracePluginManager.get();
+            lastQtracePath = outFile;
+            lastCertPath   = null;
             if (ep != null && lastStamp != null) {
                 try {
                     JsonObject qtroot = JsonParser.parseString(Files.readString(outFile)).getAsJsonObject();
@@ -441,8 +445,13 @@ public class QTraceController {
                     JsonObject lastSession = sessions.get(sessions.size() - 1).getAsJsonObject();
                     JsonObject imageRoot = qtroot.getAsJsonObject("image");
                     Path certPath = ep.buildCertificate(lastStamp, lastSession, imageRoot, outDir);
-                    if (certPath != null && panel != null)
-                        panel.log("  .qtcert: " + certPath.getFileName());
+                    if (certPath != null) {
+                        lastCertPath = certPath;
+                        if (panel != null) {
+                            panel.log("  .qtcert: " + certPath.getFileName());
+                            panel.setPushEnabled(true);
+                        }
+                    }
                 } catch (Exception e) {
                     if (panel != null) panel.log("  .qtcert: " + e.getMessage());
                 }
@@ -450,6 +459,38 @@ public class QTraceController {
         } catch (Exception e) {
             if (panel != null) panel.log("Export error: " + e.getMessage());
         }
+    }
+
+    // ── Cloud workspace push (Enterprise) ────────────────────────────────────
+
+    public void pushToWorkspace() {
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep == null) return;
+        if (lastCertPath == null || lastQtracePath == null) {
+            if (panel != null) panel.log("☁ Nothing to push — export first.");
+            return;
+        }
+        // chain.jsonl is at case_<id>/chain.jsonl, cert at case_<id>/certs/<id>.qtcert
+        Path chainLog = lastCertPath.getParent().getParent().resolve("chain.jsonl");
+        if (!chainLog.toFile().exists()) {
+            if (panel != null) panel.log("☁ chain.jsonl not found.");
+            return;
+        }
+        if (panel != null) {
+            panel.log("☁ Pushing to workspace…");
+            panel.setPushEnabled(false);
+        }
+        ep.pushToWorkspace(lastStamp, lastCertPath, chainLog, lastQtracePath)
+          .thenAccept(url -> {
+              if (url != null) {
+                  if (panel != null) panel.log("☁ " + url);
+              } else {
+                  if (panel != null) {
+                      panel.log("☁ Push failed — check network or license.");
+                      panel.setPushEnabled(true);
+                  }
+              }
+          });
     }
 
     // ── Import .qTrace (Enterprise stub) ─────────────────────────────────────

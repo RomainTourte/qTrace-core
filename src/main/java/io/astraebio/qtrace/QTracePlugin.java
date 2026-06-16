@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import qupath.lib.gui.QuPathGUI;
 
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Service interface implemented by the Enterprise module.
@@ -53,4 +54,14 @@ public interface QTracePlugin {
      */
     default Path buildCertificate(ValidationStamp stamp, JsonObject sessionPayload,
                                    JsonObject imageRoot, Path exportDir) { return null; }
+
+    /**
+     * Pushes a light bundle (.qtrace + .qtcert + chain.jsonl) to the user's qtrace.ca workspace.
+     * Returns a CompletableFuture resolving to the workspace URL, or null on failure / not supported.
+     * Auth: reads the .qtlicense JWT from QTraceConfig and sends it as a bearer token.
+     */
+    default CompletableFuture<String> pushToWorkspace(
+            ValidationStamp stamp, Path certPath, Path chainLogPath, Path qtraceFile) {
+        return CompletableFuture.completedFuture(null);
+    }
 }
