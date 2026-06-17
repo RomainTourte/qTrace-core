@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  */
 public class QTraceController {
 
-    static final String VERSION = "1.0.1";
+    static final String VERSION = "1.0.2";
 
     public static String getDisplayVersion() {
         QTracePlugin ep = QTracePluginManager.get();
@@ -484,6 +484,7 @@ public class QTraceController {
         try {
             Path outDir  = QTraceConfig.get().getExportDir();
             var exporter = new QTraceExporter(logger, null, lastStamp);
+            exporter.setExtensions(collectLoadedExtensions());
             Path outFile = exporter.export(outDir);
             Path csvFile = exporter.appendToMasterCsv(outDir);
 
@@ -578,6 +579,27 @@ public class QTraceController {
         return null;
     }
 
+    // ── Extension capture ─────────────────────────────────────────────────────
+
+    private JsonArray collectLoadedExtensions() {
+        JsonArray arr = new JsonArray();
+        try {
+            Method getExts = QuPathGUI.class.getMethod("getLoadedExtensions");
+            java.util.Collection<?> exts = (java.util.Collection<?>) getExts.invoke(qupath);
+            for (Object ext : exts) {
+                try {
+                    JsonObject ej = new JsonObject();
+                    ej.addProperty("name", (String) ext.getClass().getMethod("getName").invoke(ext));
+                    try {
+                        ej.addProperty("version", (String) ext.getClass().getMethod("getVersion").invoke(ext));
+                    } catch (Exception ignored) {}
+                    arr.add(ej);
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {}
+        return arr;
+    }
+
     // ── Batch export ─────────────────────────────────────────────────────────
 
     public void startBatchExport() {
@@ -605,6 +627,7 @@ public class QTraceController {
 
         Path exportDir = QTraceConfig.get().getExportDir();
         var  exporter  = new QTraceExporter(logger, null, lastStamp);
+        exporter.setExtensions(collectLoadedExtensions());
         Path out       = exporter.export(exportDir);
         exporter.appendToMasterCsv(exportDir);
         return out.getFileName().toString();

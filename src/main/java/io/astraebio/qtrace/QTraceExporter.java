@@ -45,11 +45,16 @@ public class QTraceExporter {
     private final ActionLogger    logger;
     private final String          gitHash;
     private final ValidationStamp stamp;
+    private       JsonArray        extensions = null;
 
     public QTraceExporter(ActionLogger logger, String gitHash, ValidationStamp stamp) {
         this.logger  = logger;
         this.gitHash = gitHash;
         this.stamp   = stamp;
+    }
+
+    public void setExtensions(JsonArray extensions) {
+        this.extensions = extensions;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -259,6 +264,10 @@ public class QTraceExporter {
 
         // Annotations with per-author attribution
         session.add("annotations", buildAnnotationsObject(imageData, outputDir, imageName));
+
+        // Loaded QuPath extensions at export time
+        if (extensions != null && extensions.size() > 0)
+            session.add("extensions", extensions);
 
         return session;
     }
