@@ -87,7 +87,14 @@ public class QTraceExporter {
             root = buildFreshRoot(imageData);
         }
 
-        root.getAsJsonArray("sessions").add(session);
+        // DAG v1: chain this commit to the previous one (last existing session_id).
+        JsonArray existingSessions = root.getAsJsonArray("sessions");
+        if (existingSessions.size() > 0) {
+            JsonObject prev = existingSessions.get(existingSessions.size() - 1).getAsJsonObject();
+            if (prev.has("session_id"))
+                session.addProperty("parent_session_id", prev.get("session_id").getAsString());
+        }
+        existingSessions.add(session);
 
         // Write or preserve workflow status
         if (stamp != null && stamp.statusLabel() != null) {
@@ -177,8 +184,11 @@ public class QTraceExporter {
         JsonObject session = new JsonObject();
 
         session.addProperty("session_id",     UUID.randomUUID().toString());
-        session.addProperty("user",           System.getProperty("user.name", "unknown"));
+        // Authoritative contributor (one commit = one author): Enterprise license → config → OS login.
+        session.addProperty("user",           QTraceController.currentContributor());
+        session.addProperty("os_user",        System.getProperty("user.name", "unknown"));  // forensic
         session.addProperty("machine",        getHostname());
+        session.addProperty("branch",         "main");  // DAG v1: single linear branch
         session.addProperty("qtrace_version", QTraceController.VERSION);
         session.addProperty("exported_at",    Instant.now().toString());
         try {
@@ -220,6 +230,10 @@ public class QTraceExporter {
         session.addProperty("steps_captured",     stepsArr.size());
         session.addProperty("manual_annotations", logger.getManualAnnotationCount());
         session.add("steps", stepsArr);
+
+        // Contributions: categorized summary of this commit's actions, attributed to its
+        // single author. Pre-tracking steps (prior contributor's inherited state) excluded.
+        session.add("contributions", buildContributions(stepsArr));
 
         // Git
         JsonObject git = new JsonObject();
@@ -270,6 +284,41 @@ public class QTraceExporter {
             session.add("extensions", extensions);
 
         return session;
+    }
+
+    /**
+     * Categorized summary of a commit's actions, attributed to its single author.
+     * Pre-tracking steps (inherited from a prior contributor) are excluded so the
+     * graph node shows only what this contributor actually did.
+     */
+    private JsonObject buildContributions(JsonArray stepsArr) {
+        JsonObject contrib = new JsonObject();
+        contrib.addProperty("contributor", QTraceController.currentContributor());
+        Map<String, Integer> actions = new LinkedHashMap<>();
+        for (JsonElement el : stepsArr) {
+            JsonObject step = el.getAsJsonObject();
+            if (step.has("pre_tracking") && step.get("pre_tracking").getAsBoolean()) continue;
+            String cmd = step.has("command") ? step.get("command").getAsString() : "";
+            actions.merge(categorizeAction(cmd), 1, Integer::sum);
+        }
+        JsonObject actionsObj = new JsonObject();
+        actions.forEach(actionsObj::addProperty);
+        contrib.add("actions", actionsObj);
+        return contrib;
+    }
+
+    /** Maps a QuPath workflow command name to a coarse action category for the graph. */
+    private static String categorizeAction(String command) {
+        String c = (command == null ? "" : command.toLowerCase());
+        if (c.startsWith("manual annotation") || c.contains("annotation")) return "annotation";
+        if (c.contains("pixel") && c.contains("classif"))                  return "pixel classification";
+        if (c.contains("cell") && c.contains("detection"))                 return "cell detection";
+        if (c.contains("classif"))                                         return "classification";
+        if (c.contains("segment"))                                         return "segmentation";
+        if (c.contains("align") || c.contains("warpy"))                    return "alignment";
+        if (c.contains("threshold"))                                       return "thresholding";
+        if (c.contains("image type"))                                      return "setup";
+        return (command == null || command.isBlank()) ? "other" : command;
     }
 
     // ── Section builders ──────────────────────────────────────────────────────

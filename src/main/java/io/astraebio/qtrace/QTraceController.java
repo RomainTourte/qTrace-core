@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  */
 public class QTraceController {
 
-    static final String VERSION = "1.0.2";
+    static final String VERSION = "1.0.3";
 
     public static String getDisplayVersion() {
         QTracePlugin ep = QTracePluginManager.get();
@@ -60,9 +60,31 @@ public class QTraceController {
         return "qTrace Core  v" + VERSION;
     }
 
+    /**
+     * Authoritative contributor identity for action attribution (one commit = one author).
+     * Resolution order:
+     *   1. valid Enterprise license holder (certified identity),
+     *   2. configured validator name in QTraceConfig,
+     *   3. OS login (System property user.name).
+     * The OS login + machine are always kept separately for forensics; this is the
+     * human-readable contributor shown on commit-graph nodes and in attributions.
+     */
+    public static String currentContributor() {
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep != null) {
+            LicenseInfo li = ep.getActiveLicenseInfo();
+            if (li != null && !li.expired() && li.name() != null && !li.name().isBlank())
+                return li.name();
+        }
+        String configured = QTraceConfig.get().getValidatorName();
+        if (configured != null && !configured.isBlank()) return configured;
+        return System.getProperty("user.name", "unknown");
+    }
+
     private final QuPathGUI qupath;
     private QTracePanel     panel;
     private QTraceDashboard dashboard;
+    private QTraceCommitGraph commitGraph;
     private ActionLogger    logger;
     private boolean         scriptHookInstalled = false;
 
@@ -138,6 +160,31 @@ public class QTraceController {
         } else {
             dashboard.minimize();
         }
+    }
+
+    /** Opens the commit-graph window for the current image's .qtrace (Enterprise feature). */
+    public void showCommitGraph() {
+        File preselected = currentQtraceFile();
+        if (commitGraph == null || !commitGraph.isShowing()) {
+            commitGraph = new QTraceCommitGraph(qupath);
+            commitGraph.show(preselected);
+        } else if (commitGraph.isIconified()) {
+            commitGraph.front();
+        } else {
+            commitGraph.minimize();
+        }
+    }
+
+    /** Resolves the .qtrace path for the current image, or null if none yet. */
+    private File currentQtraceFile() {
+        try {
+            var imageData = logger.getCurrentImageData();
+            if (imageData == null) return null;
+            String base = imageData.getServer().getMetadata().getName()
+                .replaceAll("[^a-zA-Z0-9._-]", "_");
+            Path outFile = QTraceConfig.get().getExportDir().resolve(base + ".qtrace");
+            return Files.exists(outFile) ? outFile.toFile() : null;
+        } catch (Exception ignored) { return null; }
     }
 
     public void showPreferences() {

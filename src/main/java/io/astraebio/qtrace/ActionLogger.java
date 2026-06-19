@@ -190,7 +190,7 @@ public class ActionLogger implements WorkflowListener {
         // steps added after qTrace opened.
         List<WorkflowStep> existing = imageData.getHistoryWorkflow().getSteps();
         for (int i = 0; i < existing.size(); i++) {
-            capturedSteps.add(serializeStep(existing.get(i), i));
+            capturedSteps.add(serializeStep(existing.get(i), i, true));  // pre-tracking: prior contributor
         }
         preExistingStepCount = existing.size();
 
@@ -281,11 +281,22 @@ public class ActionLogger implements WorkflowListener {
     // ── Serialization ────────────────────────────────────────────────────────
 
     private JsonObject serializeStep(WorkflowStep step, int order) {
+        return serializeStep(step, order, false);
+    }
+
+    /**
+     * Serializes one workflow step. When {@code preTracking} is true the step was
+     * already present in QuPath's workflow history when qTrace attached (i.e. done by a
+     * prior contributor before tracking started) — it is flagged so the commit graph can
+     * show it as inherited state rather than attribute it to the current committer.
+     */
+    private JsonObject serializeStep(WorkflowStep step, int order, boolean preTracking) {
         JsonObject json = new JsonObject();
         json.addProperty("order",         order);
         json.addProperty("command",       step.getName());
         json.addProperty("timestamp",     Instant.now().toString());
         json.addProperty("is_scriptable", step instanceof ScriptableWorkflowStep);
+        if (preTracking) json.addProperty("pre_tracking", true);
 
         if (step instanceof ScriptableWorkflowStep s) {
             json.addProperty("script_fragment", s.getScript());
@@ -387,7 +398,7 @@ public class ActionLogger implements WorkflowListener {
             if (snapshotAnnotationIds.contains(uuid)) return;
 
             // Persist author attribution on the PathObject (protected API, accessed via reflection)
-            ActionLogger.storeAnnotationMeta(obj, "qtrace.author",      System.getProperty("user.name", "unknown"));
+            ActionLogger.storeAnnotationMeta(obj, "qtrace.author",      QTraceController.currentContributor());
             ActionLogger.storeAnnotationMeta(obj, "qtrace.captured_at", Instant.now().toString());
 
             String roiName  = (obj.getROI() != null) ? obj.getROI().getRoiName() : "Object";
@@ -576,7 +587,7 @@ public class ActionLogger implements WorkflowListener {
             } catch (Exception ignored) {}
 
             currentAlignment = new AlignmentRecord(
-                Instant.now(), System.getProperty("user.name", "unknown"),
+                Instant.now(), QTraceController.currentContributor(),
                 "AffineServer", "AffineTransform2D",
                 matrix, "java_affine",
                 imageHash != null ? imageHash : "(pending)",
@@ -718,7 +729,7 @@ public class ActionLogger implements WorkflowListener {
         }
 
         currentAlignment = new AlignmentRecord(
-            Instant.now(), System.getProperty("user.name", "unknown"),
+            Instant.now(), QTraceController.currentContributor(),
             "WarpyTextArea", "WarpyAffine",
             matrix, "imglib2_rowmajor",
             imageHash != null ? imageHash : "(pending)",
@@ -861,7 +872,7 @@ public class ActionLogger implements WorkflowListener {
             } catch (Exception ignored) {}
 
             currentAlignment = new AlignmentRecord(
-                Instant.now(), System.getProperty("user.name", "unknown"),
+                Instant.now(), QTraceController.currentContributor(),
                 "WarpyFile", "WarpyAffine",
                 matrix, "imglib2_rowmajor",
                 imageHash != null ? imageHash : "(pending)",
@@ -953,7 +964,7 @@ public class ActionLogger implements WorkflowListener {
         for (int i = 0; i < values.size(); i++) thresholds[i] = values.get(i);
         cellIntensityRecords.put(measurement, new CellIntensityRecord(
             measurement, thresholds, Instant.now(),
-            System.getProperty("user.name", "unknown")));
+            QTraceController.currentContributor()));
         if (panel != null) panel.log("[Cell intensity] '" + measurement + "' → " + Arrays.toString(thresholds));
     }
 
@@ -1003,7 +1014,7 @@ public class ActionLogger implements WorkflowListener {
             if (existing != null && sha256.equals(existing.sha256)) return;
 
             ClassifierMeta meta  = parseClassifierMeta(json);
-            String user          = System.getProperty("user.name", "unknown");
+            String user          = QTraceController.currentContributor();
             String imgAtSave     = (imageHash != null) ? imageHash : "(pending)";
 
             ClassifierRecord record = new ClassifierRecord(
@@ -1157,7 +1168,7 @@ public class ActionLogger implements WorkflowListener {
         objClassifierWarnedAt.put(name, now);
 
         boolean nameValid = CLASSIFIER_NAME_PATTERN.matcher(name).matches();
-        String user = System.getProperty("user.name", "unknown");
+        String user = QTraceController.currentContributor();
 
         // Always record
         JsonObject rec = new JsonObject();
@@ -1206,7 +1217,7 @@ public class ActionLogger implements WorkflowListener {
             ClassifierMeta meta = parseClassifierMeta(json);
 
             // Attribution
-            String user      = System.getProperty("user.name", "unknown");
+            String user      = QTraceController.currentContributor();
             String imgAtSave = (imageHash != null) ? imageHash : "(pending)";
 
             // Training annotation snapshot — all annotations present at save time.

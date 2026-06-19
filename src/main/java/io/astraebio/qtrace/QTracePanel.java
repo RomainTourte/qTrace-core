@@ -235,7 +235,21 @@ public class QTracePanel {
             btnReplay.setOnMouseExited(e  -> btnReplay.setTextFill(Color.web(GREEN)));
             btnReplay.setOnAction(e -> controller.openReplayDialog());
 
-            header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, btnPush, btnReplay, dashboard, batchBtn, reset, gear);
+            // ⑃ Commit graph — visualize the .qtrace version history (contributors per commit)
+            Button btnGraph = new Button("⑃");
+            btnGraph.setFont(Font.font("System", FontWeight.BOLD, 14));
+            btnGraph.setTextFill(Color.web(TEXT_MUTED));
+            btnGraph.setTooltip(new Tooltip(QTraceI18n.t("btn.graph.tooltip")));
+            btnGraph.setStyle(
+                "-fx-background-color: transparent;"
+              + "-fx-cursor: hand;"
+              + "-fx-padding: 0 4 0 4;"
+            );
+            btnGraph.setOnMouseEntered(e -> btnGraph.setTextFill(Color.web(BLUE)));
+            btnGraph.setOnMouseExited(e  -> btnGraph.setTextFill(Color.web(TEXT_MUTED)));
+            btnGraph.setOnAction(e -> controller.showCommitGraph());
+
+            header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, btnPush, btnReplay, btnGraph, dashboard, batchBtn, reset, gear);
         } else {
             header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, dashboard, batchBtn, reset, gear);
         }

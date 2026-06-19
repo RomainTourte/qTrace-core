@@ -98,7 +98,7 @@ public class ValidationStamper {
         confidenceBox.setValue("High");
 
         TextArea notesArea = new TextArea();
-        notesArea.setPromptText("Optional — anomalies, caveats, deviations from SOP…");
+        notesArea.setPromptText("Commit title — summary of this stamp; anomalies, caveats, deviations from SOP…");
         notesArea.setPrefRowCount(3);
         notesArea.setWrapText(true);
 
@@ -160,7 +160,7 @@ public class ValidationStamper {
         grid.add(new Label("Case ID"),            0, row); grid.add(caseIdField,    1, row++);
         grid.add(new Label("Scope"),              0, row); grid.add(scopeBox,       1, row++);
         grid.add(new Label("Confidence"),         0, row); grid.add(confidenceBox,  1, row++);
-        grid.add(new Label("Notes"),              0, row); grid.add(notesArea,      1, row++);
+        grid.add(new Label("Notes / commit title"), 0, row); grid.add(notesArea,    1, row++);
         if (attestationBox != null) {
             grid.add(new Label("Attestation *"),  0, row); grid.add(attestationBox, 1, row++);
         }
