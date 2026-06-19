@@ -132,9 +132,9 @@ public class QTraceDashboard {
         javafx.scene.image.Image logo = QTracePanel.loadLogo();
         if (logo != null) stage.getIcons().add(logo);
         stage.setResizable(true);
-        stage.setMinWidth(750);
+        stage.setMinWidth(900);
         stage.setMinHeight(500);
-        stage.setWidth(1180);
+        stage.setWidth(1420);
         stage.setHeight(820);
 
         tableRows     = new VBox(0);
@@ -1064,8 +1064,7 @@ public class QTraceDashboard {
 
         // ── Right: notes + commit (future) ───────────────────────────────────
         VBox right = new VBox(5);
-        right.setMinWidth(190);
-        right.setMaxWidth(230);
+        right.setMinWidth(260);
         right.setPadding(new Insets(2, 8, 0, 20));
         right.setAlignment(Pos.TOP_LEFT);
         right.setStyle("-fx-border-color: " + BORDER + "; -fx-border-width: 0 0 0 1;");
@@ -1073,7 +1072,8 @@ public class QTraceDashboard {
         if (!notes.isBlank()) {
             right.getChildren().add(lbl("Notes", TEXT_MUTED, 9, FontWeight.BOLD, false));
             Label notesLbl = lbl("\"" + notes + "\"", TEXT_SUB, 11, FontWeight.NORMAL, true);
-            notesLbl.setMaxWidth(200);
+            notesLbl.setMinWidth(240);
+            notesLbl.setMaxWidth(360);
             right.getChildren().add(notesLbl);
         }
         if (!gitCommit.isBlank()) {
@@ -1085,9 +1085,8 @@ public class QTraceDashboard {
             right.getChildren().add(commitLbl);
         }
 
-        // ── Assemble ──────────────────────────────────────────────────────────
+        // ── Assemble — notes collées au contenu gauche, pas en bout de ligne ──
         HBox outer = new HBox(0, left);
-        HBox.setHgrow(left, Priority.ALWAYS);
         outer.setAlignment(Pos.TOP_LEFT);
         if (!right.getChildren().isEmpty())
             outer.getChildren().add(right);
