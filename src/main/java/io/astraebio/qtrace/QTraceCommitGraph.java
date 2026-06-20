@@ -309,6 +309,8 @@ public class QTraceCommitGraph {
             detailBox.getChildren().add(kv(QTraceI18n.t("graph.detail.confidence"), n.confidence));
         if (n.fidelity != null)
             detailBox.getChildren().add(kv(QTraceI18n.t("graph.detail.fidelity"), n.fidelity));
+        if (n.scope != null && !n.scope.isBlank())
+            detailBox.getChildren().add(kv(QTraceI18n.t("graph.detail.scope"), n.scope));
         detailBox.getChildren().add(kv(QTraceI18n.t("graph.detail.branch"), n.branch));
         detailBox.getChildren().add(kv(QTraceI18n.t("graph.detail.date"), dateShort(n.exportedAt)));
         if (n.imageHashShort != null)
@@ -367,8 +369,8 @@ public class QTraceCommitGraph {
     }
 
     private static String title(Node n) {
+        // Commit title is the stamp notes, never the scope.
         if (n.notes != null && !n.notes.isBlank()) return n.notes;
-        if (n.scope != null && !n.scope.isBlank()) return n.scope;
         return "Session #" + (n.index + 1);
     }
 
