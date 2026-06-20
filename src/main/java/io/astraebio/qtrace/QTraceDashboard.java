@@ -1554,7 +1554,7 @@ public class QTraceDashboard {
         annotationsCardContent.getChildren().add(
             lbl("Session timeline", TEXT_MUTED, 10, FontWeight.BOLD, false));
 
-        for (int i = 0; i < sessions.size(); i++) {
+        for (int i = sessions.size() - 1; i >= 0; i--) {   // newest first
             JsonObject s       = sessions.get(i).getAsJsonObject();
             String user        = str(s, "user",        "?");
             String machine     = str(s, "machine",     "");
