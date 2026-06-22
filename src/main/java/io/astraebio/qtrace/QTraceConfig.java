@@ -35,6 +35,10 @@ public class QTraceConfig {
     private String licensePath;
     private String signingKeyPath; // path to qtrace-signing.key; null = default ~/.qTrace/qtrace-signing.key
 
+    // Auto-update (null updateCheckEnabled = enabled by default)
+    private Boolean updateCheckEnabled;
+    private String  dismissedUpdateVersion; // version the user chose to skip
+
     private QTraceConfig() {}
 
     public static QTraceConfig get() {
@@ -73,6 +77,14 @@ public class QTraceConfig {
 
     public String getSigningKeyPath()         { return signingKeyPath != null ? signingKeyPath : ""; }
     public void   setSigningKeyPath(String p) { this.signingKeyPath = blank(p); }
+
+    // ── Auto-update ─────────────────────────────────────────────────────────────
+
+    public boolean isUpdateCheckEnabled()        { return updateCheckEnabled == null || updateCheckEnabled; }
+    public void    setUpdateCheckEnabled(boolean b) { this.updateCheckEnabled = b; }
+
+    public String getDismissedUpdateVersion()       { return dismissedUpdateVersion != null ? dismissedUpdateVersion : ""; }
+    public void   setDismissedUpdateVersion(String v) { this.dismissedUpdateVersion = blank(v); }
 
     // ── Raw string getters (for the dialog text fields) ───────────────────────
 

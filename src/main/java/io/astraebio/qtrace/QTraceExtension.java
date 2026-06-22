@@ -13,6 +13,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.extensions.GitHubProject;
 import qupath.lib.gui.extensions.QuPathExtension;
 
 import java.util.ServiceLoader;
@@ -27,17 +28,36 @@ import java.util.ServiceLoader;
  *  - "Extensions > QTrace" menu
  *  - A toolbar MenuButton (icon + dropdown) with recording state indicator
  */
-public class QTraceExtension implements QuPathExtension {
+public class QTraceExtension implements QuPathExtension, GitHubProject {
 
     private static final String COLOR_IDLE      = "#6c7086"; // Catppuccin TEXT_MUTED — no image
     private static final String COLOR_RECORDING = "#f38ba8"; // Catppuccin RED — recording active
+
+    // Guards against a double install if an update left two qtrace-core JARs on the
+    // classpath for one restart (QuPath instantiates one extension per service entry).
+    private static boolean installed = false;
 
     private QTraceController controller;
 
     @Override
     public void installExtension(QuPathGUI qupath) {
-        ServiceLoader.load(QTracePlugin.class, QTracePlugin.class.getClassLoader())
-            .findFirst().ifPresent(QTracePluginManager::register);
+        if (installed) return;
+        installed = true;
+
+        // Best-effort cleanup of superseded JARs left by a previous auto-update.
+        QTraceUpdater.reapOldJars(QTraceExtension.class, "enterprise");
+        QTraceUpdater.reapOldJars(QTraceExtension.class, "core");
+
+        // Register the highest-version QTracePlugin among those discovered — an update
+        // may leave two enterprise JARs loaded until the old file is reaped next restart.
+        QTracePlugin best = null;
+        for (QTracePlugin p : ServiceLoader.load(QTracePlugin.class, QTracePlugin.class.getClassLoader())) {
+            if (best == null || QTraceUpdater.compareSemver(
+                    nz(p.getPluginVersion()), nz(best.getPluginVersion())) > 0) {
+                best = p;
+            }
+        }
+        if (best != null) QTracePluginManager.register(best);
 
         controller = new QTraceController(qupath);
 
@@ -60,7 +80,14 @@ public class QTraceExtension implements QuPathExtension {
 
         // ── Toolbar button (added on FX thread after QuPath finishes layout) ───
         Platform.runLater(() -> addToolbarButton(qupath));
+
+        // ── Startup update checks (async; user-validated, applied on restart) ──
+        QTraceUpdater.checkCore(qupath);
+        QTracePlugin ep = QTracePluginManager.get();
+        if (ep != null) ep.checkForUpdate(qupath);
     }
+
+    private static String nz(String s) { return s != null ? s : "0"; }
 
     private void addToolbarButton(QuPathGUI qupath) {
         // ── Icon: logo over a coloured rectangle ───────────────────────────────
@@ -124,5 +151,12 @@ public class QTraceExtension implements QuPathExtension {
     @Override
     public String getDescription() {
         return "Captures QuPath workflow history and certifies analyses with expert validation stamps.";
+    }
+
+    /** Lets QuPath's native update checker track the public Core repo. */
+    @Override
+    public GitHubProject.GitHubRepo getRepository() {
+        return GitHubProject.GitHubRepo.create(
+            "qTrace — Workflow Provenance & Certification", "RomainTourte", "qTrace-core");
     }
 }
