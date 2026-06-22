@@ -730,7 +730,7 @@ public class QTraceController {
                   if (panel != null) panel.log("▤ " + QTraceI18n.t("report.failed"));
               } else {
                   if (panel != null) panel.log("▤ " + QTraceI18n.t("report.ready"));
-                  ReportDialog.show(qupath.getStage(), qtrace, markdown,
+                  ReportDialog.show(qupath.getStage(), qtrace, markdown, ep,
                       msg -> { if (panel != null) panel.log("▤ " + msg); });
               }
           }))

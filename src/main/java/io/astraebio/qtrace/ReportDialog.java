@@ -1,5 +1,6 @@
 package io.astraebio.qtrace;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -39,7 +40,8 @@ public class ReportDialog {
      * @param markdown the report text
      * @param log      callback for user-facing status lines (may be null)
      */
-    public static void show(Window owner, Path qtrace, String markdown, Consumer<String> log) {
+    public static void show(Window owner, Path qtrace, String markdown,
+                             QTracePlugin ep, Consumer<String> log) {
         Stage stage = new Stage();
         if (owner != null) {
             stage.initOwner(owner);
@@ -66,7 +68,35 @@ public class ReportDialog {
           + "-fx-border-radius: 4; -fx-background-radius: 4;");
         save.setOnAction(e -> saveMarkdown(stage, qtrace, markdown, log));
 
-        HBox buttons = new HBox(8, save);
+        Button exportPdf = new Button(QTraceI18n.t("report.export.pdf"));
+        exportPdf.setStyle(
+            "-fx-background-color: " + BG_CARD + ";"
+          + "-fx-text-fill: " + BLUE + ";"
+          + "-fx-border-color: " + BORDER + ";"
+          + "-fx-border-radius: 4; -fx-background-radius: 4;");
+        exportPdf.setOnAction(e -> {
+            exportPdf.setDisable(true);
+            exportPdf.setText(QTraceI18n.t("report.pdf.generating"));
+            if (log != null) log.accept(QTraceI18n.t("report.pdf.generating"));
+            ep.exportReportPdf(markdown).thenAccept(pdfBytes -> Platform.runLater(() -> {
+                exportPdf.setDisable(false);
+                exportPdf.setText(QTraceI18n.t("report.export.pdf"));
+                if (pdfBytes == null || pdfBytes.length == 0) {
+                    if (log != null) log.accept(QTraceI18n.t("report.pdf.failed"));
+                    return;
+                }
+                savePdf(stage, qtrace, pdfBytes, log);
+            })).exceptionally(t -> {
+                Platform.runLater(() -> {
+                    exportPdf.setDisable(false);
+                    exportPdf.setText(QTraceI18n.t("report.export.pdf"));
+                    if (log != null) log.accept(QTraceI18n.t("report.pdf.failed"));
+                });
+                return null;
+            });
+        });
+
+        HBox buttons = new HBox(8, save, exportPdf);
         buttons.setAlignment(Pos.CENTER_RIGHT);
 
         VBox root = new VBox(10, area, buttons);
@@ -75,6 +105,28 @@ public class ReportDialog {
 
         stage.setScene(new Scene(root, 720, 560));
         stage.show();
+    }
+
+    private static void savePdf(Stage stage, Path qtrace, byte[] pdfBytes, Consumer<String> log) {
+        String base = qtrace.getFileName().toString();
+        if (base.endsWith(".qtrace")) base = base.substring(0, base.length() - ".qtrace".length());
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(QTraceI18n.t("report.export.pdf"));
+        chooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("PDF", "*.pdf"));
+        Path parent = qtrace.getParent();
+        if (parent != null) chooser.setInitialDirectory(parent.toFile());
+        chooser.setInitialFileName(base + ".report.pdf");
+
+        java.io.File target = chooser.showSaveDialog(stage);
+        if (target == null) return;
+        try {
+            Files.write(target.toPath(), pdfBytes);
+            if (log != null) log.accept(QTraceI18n.t("report.pdf.saved") + " " + target.getName());
+        } catch (Exception ex) {
+            if (log != null) log.accept(QTraceI18n.t("report.error") + ": " + ex.getMessage());
+        }
     }
 
     private static void saveMarkdown(Stage stage, Path qtrace, String markdown, Consumer<String> log) {

@@ -89,4 +89,13 @@ public interface QTracePlugin {
     default CompletableFuture<String> sendReportDigest(String digestJson, String lang) {
         return CompletableFuture.completedFuture(null);
     }
+
+    /**
+     * Renders the Markdown activity report as a PDF via the qtrace.ca portal.
+     * Returns a CompletableFuture resolving to the raw PDF bytes, or null on
+     * failure / not supported.
+     */
+    default CompletableFuture<byte[]> exportReportPdf(String markdown) {
+        return CompletableFuture.completedFuture(null);
+    }
 }
