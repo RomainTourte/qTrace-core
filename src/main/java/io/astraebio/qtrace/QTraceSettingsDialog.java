@@ -151,8 +151,10 @@ public class QTraceSettingsDialog {
 
         Button btnGetLicense = flatButton("🔗 Get license", BLUE);
         btnGetLicense.setOnAction(e -> {
-            try { Desktop.getDesktop().browse(new URI(PORTAL_URL)); }
-            catch (Exception ignored) {}
+            new Thread(() -> {
+                try { Desktop.getDesktop().browse(new URI(PORTAL_URL)); }
+                catch (Exception ignored) {}
+            }, "qtrace-browser").start();
         });
 
         GridPane licenseGrid = new GridPane();
