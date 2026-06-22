@@ -61,10 +61,15 @@ public class QTracePanel {
         stage.initModality(Modality.NONE);
         stage.setTitle(QTraceController.getEditionLabel());
         stage.setResizable(true);
-        stage.setMinWidth(280);
         stage.setMinHeight(340);
-        stage.setWidth(320);
         stage.setHeight(460);
+        if (QTracePluginManager.isEntitled()) {
+            stage.setMinWidth(460);
+            stage.setWidth(540);
+        } else {
+            stage.setMinWidth(300);
+            stage.setWidth(340);
+        }
         Image logo = loadLogo();
         if (logo != null) stage.getIcons().add(logo);
         stage.setScene(new Scene(buildRoot()));
@@ -473,6 +478,12 @@ public class QTracePanel {
     public void refresh() {
         Platform.runLater(() -> {
             stage.setTitle(QTraceController.getEditionLabel());
+            if (QTracePluginManager.isEntitled()) {
+                stage.setMinWidth(460);
+                if (stage.getWidth() < 460) stage.setWidth(540);
+            } else {
+                stage.setMinWidth(300);
+            }
             stage.setScene(new Scene(buildRoot()));
             refreshStatus();
         });
