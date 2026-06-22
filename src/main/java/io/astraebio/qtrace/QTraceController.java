@@ -164,7 +164,20 @@ public class QTraceController {
 
     /** Opens the commit-graph window for the current image's .qtrace (Enterprise feature). */
     public void showCommitGraph() {
+        // Nothing to graph until there is a project, an open image, and at least one stamp (.qtrace).
+        if (qupath.getProject() == null) {
+            showGraphInfo(QTraceI18n.t("graph.info.noproject"));
+            return;
+        }
+        if (qupath.getImageData() == null) {
+            showGraphInfo(QTraceI18n.t("graph.info.noimage"));
+            return;
+        }
         File preselected = currentQtraceFile();
+        if (preselected == null) {
+            showGraphInfo(QTraceI18n.t("graph.info.nostamp"));
+            return;
+        }
         if (commitGraph == null || !commitGraph.isShowing()) {
             commitGraph = new QTraceCommitGraph(qupath);
             commitGraph.show(preselected);
@@ -185,6 +198,20 @@ public class QTraceController {
             Path outFile = QTraceConfig.get().getExportDir().resolve(base + ".qtrace");
             return Files.exists(outFile) ? outFile.toFile() : null;
         } catch (Exception ignored) { return null; }
+    }
+
+    /** Non-blocking info alert shown when the commit graph has nothing to display. */
+    private void showGraphInfo(String message) {
+        Platform.runLater(() -> {
+            javafx.scene.control.Alert alert =
+                new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle(QTraceI18n.t("graph.window.title"));
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            if (qupath != null && qupath.getStage() != null)
+                alert.initOwner(qupath.getStage());
+            alert.show();
+        });
     }
 
     public void showPreferences() {
