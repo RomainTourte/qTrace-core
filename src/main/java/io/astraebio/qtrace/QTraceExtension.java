@@ -82,9 +82,9 @@ public class QTraceExtension implements QuPathExtension, GitHubProject {
         Platform.runLater(() -> addToolbarButton(qupath));
 
         // ── Startup update checks (async; user-validated, applied on restart) ──
+        // Both checks are Core-driven so an old enterprise JAR still gets updated.
         QTraceUpdater.checkCore(qupath);
-        QTracePlugin ep = QTracePluginManager.get();
-        if (ep != null) ep.checkForUpdate(qupath);
+        QTraceUpdater.checkEnterprise(qupath, QTracePluginManager.get());
     }
 
     private static String nz(String s) { return s != null ? s : "0"; }

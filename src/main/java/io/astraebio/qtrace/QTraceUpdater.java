@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -42,6 +43,10 @@ public final class QTraceUpdater {
 
     private static final String GITHUB_LATEST =
         "https://api.github.com/repos/RomainTourte/qTrace-core/releases/latest";
+    private static final String VERSION_URL =
+        "https://q-trace-alpha.vercel.app/api/version";
+    private static final String ENT_DOWNLOAD_URL =
+        "https://q-trace-alpha.vercel.app/api/download/enterprise/licensed";
 
     private static final Pattern JAR_VERSION =
         Pattern.compile("^qtrace-(?:core|enterprise)-(\\d+(?:\\.\\d+)*)\\.jar$");
@@ -94,6 +99,55 @@ public final class QTraceUpdater {
                 // offline / rate-limited — stay silent
             }
         });
+    }
+
+    // ── Enterprise check (driven by Core, works with any enterprise JAR) ─────────
+
+    /**
+     * Async, safe. Offers an Enterprise update based on the qtrace.ca manifest.
+     * Driven by the Core (not the enterprise JAR) so it works even when the
+     * installed enterprise JAR predates the auto-update feature — it only reads
+     * the loaded plugin's reported version and the license from config.
+     */
+    public static void checkEnterprise(QuPathGUI qupath, QTracePlugin ep) {
+        if (ep == null || !QTraceConfig.get().isUpdateCheckEnabled()) return;
+        final String currentVer = ep.getPluginVersion();
+        CompletableFuture.runAsync(() -> {
+            try {
+                String jwt = licenseJwt();
+                if (jwt == null) return; // no license → can't authenticate the download
+
+                byte[] mb = httpGetBytes(VERSION_URL, null);
+                JsonObject manifest = JsonParser
+                    .parseString(new String(mb, StandardCharsets.UTF_8)).getAsJsonObject();
+                if (!manifest.has("enterprise")) return;
+                JsonObject ent = manifest.getAsJsonObject("enterprise");
+                String remoteVer = ent.has("version") ? ent.get("version").getAsString() : null;
+                String sha256    = ent.has("sha256")  ? ent.get("sha256").getAsString()  : null;
+                if (remoteVer == null) return;
+
+                Downloader dl = () -> httpGetBytes(ENT_DOWNLOAD_URL, jwt);
+                promptAndInstall(qupath, "enterprise", currentVer, remoteVer, sha256, dl);
+            } catch (Exception ignored) {
+                // offline / no license — stay silent
+            }
+        });
+    }
+
+    /** Reads the .qtlicense JWT from config (bare JWT or {"jwt":...} envelope). */
+    private static String licenseJwt() {
+        try {
+            String path = QTraceConfig.get().getLicensePath();
+            if (path == null || path.isBlank()) return null;
+            String content = Files.readString(Path.of(path)).strip();
+            if (content.startsWith("{")) {
+                JsonObject env = JsonParser.parseString(content).getAsJsonObject();
+                return env.has("jwt") ? env.get("jwt").getAsString() : null;
+            }
+            return content;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ── Shared install flow ─────────────────────────────────────────────────────

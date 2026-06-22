@@ -23,13 +23,6 @@ public interface QTracePlugin {
     default void replay(QuPathGUI qupath, ActionLogger logger) {}
 
     /**
-     * Checks qtrace.ca for a newer Enterprise JAR and, on user confirmation,
-     * downloads + installs it into the QuPath extensions directory (applied on restart).
-     * Runs asynchronously and silently no-ops when offline / no license.
-     */
-    default void checkForUpdate(QuPathGUI qupath) {}
-
-    /**
      * Validates a .qtlicense JWT token.
      * Returns a decoded {@link LicenseInfo} if the signature is valid and the token is not expired,
      * or null if the token is invalid.
