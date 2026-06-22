@@ -188,6 +188,32 @@ public class QTraceSettingsDialog {
         Separator sep  = new Separator();
         sep.setStyle("-fx-background-color: " + BORDER + ";");
 
+        // ── Security (activity report) ──────────────────────────────────────────
+        Separator sep3 = new Separator();
+        sep3.setStyle("-fx-background-color: " + BORDER + ";");
+
+        CheckBox chkReportConfirm = new CheckBox(QTraceI18n.t("settings.security.confirm"));
+        chkReportConfirm.setSelected(cfg.isReportConfirmBeforeSend());
+        chkReportConfirm.setTextFill(Color.web(TEXT_SUB));
+        chkReportConfirm.setWrapText(true);
+
+        Label securityHint = new Label(QTraceI18n.t("settings.security.confirm.hint"));
+        securityHint.setTextFill(Color.web(TEXT_MUTED));
+        securityHint.setFont(Font.font("System", 11));
+        securityHint.setWrapText(true);
+
+        CheckBox chkPseudonymize = new CheckBox(QTraceI18n.t("settings.security.pseudonymize"));
+        chkPseudonymize.setDisable(true);   // shown now, implemented later
+        chkPseudonymize.setTextFill(Color.web(TEXT_MUTED));
+        Label pseudoSoon = new Label(QTraceI18n.t("report.confirm.soon"));
+        pseudoSoon.setTextFill(Color.web(TEXT_MUTED));
+        pseudoSoon.setFont(Font.font("System", 10));
+        HBox pseudoRow = new HBox(8, chkPseudonymize, pseudoSoon);
+        pseudoRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox securityBox = new VBox(6, chkReportConfirm, securityHint, pseudoRow);
+        securityBox.setPadding(new Insets(4, 20, 8, 20));
+
         // ── Buttons ────────────────────────────────────────────────────────────
         Button btnReset  = flatButton("Reset all to default", TEXT_MUTED);
         Button btnCancel = flatButton("Cancel",               TEXT_SUB);
@@ -210,6 +236,7 @@ public class QTraceSettingsDialog {
             cfg.setTrainingDir(tfTraining.getText());
             cfg.setValidatorName(tfValidator.getText());
             cfg.setLicensePath(tfLicense.getText());
+            cfg.setReportConfirmBeforeSend(chkReportConfirm.isSelected());
             cfg.save();
             dlg.close();
         });
@@ -228,6 +255,9 @@ public class QTraceSettingsDialog {
             sep2,
             sectionTitle("Enterprise License"),
             licenseGrid,
+            sep3,
+            sectionTitle(QTraceI18n.t("settings.security.tab")),
+            securityBox,
             buttonRow);
         VBox.setMargin(hint,          new Insets(0, 20, 8, 20));
         VBox.setMargin(validatorHint, new Insets(0, 20, 8, 20));

@@ -21,9 +21,11 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
@@ -685,13 +687,45 @@ public class QTraceController {
             return;
         }
         if (panel != null) panel.log("📄 " + QTraceI18n.t("report.generating"));
-        ep.generateActivityReport(qtrace.toPath())
+        // Build the digest off the FX thread — a .qtrace can be tens of MB.
+        CompletableFuture.supplyAsync(() -> ep.buildReportDigest(qtrace.toPath()))
+            .thenAccept(digest -> Platform.runLater(() -> {
+                if (digest == null || digest.isBlank()) {
+                    if (panel != null) panel.log("📄 " + QTraceI18n.t("report.failed"));
+                    return;
+                }
+                // Security/transparency: let the user review exactly what is transmitted.
+                if (QTraceConfig.get().isReportConfirmBeforeSend()) {
+                    ReportConfirmDialog.Result r = ReportConfirmDialog.show(qupath.getStage(), digest);
+                    if (!r.send) {
+                        if (panel != null) panel.log("📄 " + QTraceI18n.t("report.cancelled"));
+                        return;
+                    }
+                    if (r.dontAskAgain) {
+                        QTraceConfig.get().setReportConfirmBeforeSend(false);
+                        QTraceConfig.get().save();
+                    }
+                }
+                // Audit artifact: persist exactly what was sent, next to the .qtrace.
+                writeReportAuditInput(qtrace.toPath(), digest);
+                sendReportAndShow(ep, qtrace.toPath(), digest);
+            }))
+            .exceptionally(t -> {
+                Platform.runLater(() -> {
+                    if (panel != null) panel.log("📄 " + QTraceI18n.t("report.error") + ": " + t.getMessage());
+                });
+                return null;
+            });
+    }
+
+    private void sendReportAndShow(QTracePlugin ep, Path qtrace, String digest) {
+        ep.sendReportDigest(digest)
           .thenAccept(markdown -> Platform.runLater(() -> {
               if (markdown == null || markdown.isBlank()) {
                   if (panel != null) panel.log("📄 " + QTraceI18n.t("report.failed"));
               } else {
                   if (panel != null) panel.log("📄 " + QTraceI18n.t("report.ready"));
-                  ReportDialog.show(qupath.getStage(), qtrace.toPath(), markdown,
+                  ReportDialog.show(qupath.getStage(), qtrace, markdown,
                       msg -> { if (panel != null) panel.log("📄 " + msg); });
               }
           }))
@@ -701,6 +735,19 @@ public class QTraceController {
               });
               return null;
           });
+    }
+
+    /** Writes the exact digest sent to Claude next to the .qtrace, as an audit trail. */
+    private void writeReportAuditInput(Path qtrace, String digest) {
+        try {
+            String base = qtrace.getFileName().toString();
+            if (base.endsWith(".qtrace")) base = base.substring(0, base.length() - ".qtrace".length());
+            Path out = qtrace.resolveSibling(base + ".report-input.json");
+            Files.write(out, digest.getBytes(StandardCharsets.UTF_8));
+            if (panel != null) panel.log("📄 " + QTraceI18n.t("report.audit.saved") + " " + out.getFileName());
+        } catch (Exception e) {
+            if (panel != null) panel.log("📄 " + QTraceI18n.t("report.error") + ": " + e.getMessage());
+        }
     }
 
     // ── Import .qTrace (Enterprise stub) ─────────────────────────────────────

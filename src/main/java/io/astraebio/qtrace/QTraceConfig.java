@@ -39,6 +39,10 @@ public class QTraceConfig {
     private Boolean updateCheckEnabled;
     private String  dismissedUpdateVersion; // version the user chose to skip
 
+    // Activity report — confirm the data sent to Claude before each send
+    // (null = ask by default; user can disable via "ne plus me demander" / Security settings)
+    private Boolean reportConfirmBeforeSend;
+
     private QTraceConfig() {}
 
     public static QTraceConfig get() {
@@ -85,6 +89,12 @@ public class QTraceConfig {
 
     public String getDismissedUpdateVersion()       { return dismissedUpdateVersion != null ? dismissedUpdateVersion : ""; }
     public void   setDismissedUpdateVersion(String v) { this.dismissedUpdateVersion = blank(v); }
+
+    // ── Activity report — security/audit ──────────────────────────────────────
+
+    /** Whether to show the pre-send confirmation (data preview) before each report. Default: yes. */
+    public boolean isReportConfirmBeforeSend()        { return reportConfirmBeforeSend == null || reportConfirmBeforeSend; }
+    public void    setReportConfirmBeforeSend(boolean b) { this.reportConfirmBeforeSend = b; }
 
     // ── Raw string getters (for the dialog text fields) ───────────────────────
 
