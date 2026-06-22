@@ -258,7 +258,21 @@ public class QTracePanel {
             btnGraph.setOnMouseExited(e  -> btnGraph.setTextFill(Color.web(TEXT_MUTED)));
             btnGraph.setOnAction(e -> controller.showCommitGraph());
 
-            header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, btnPush, btnReplay, btnGraph, dashboard, batchBtn, reset, gear);
+            // 📄 Activity report — per-contributor LLM summary of the .qtrace
+            Button btnReport = new Button("📄");
+            btnReport.setFont(Font.font("System", 13));
+            btnReport.setTextFill(Color.web(TEXT_MUTED));
+            btnReport.setTooltip(new Tooltip(QTraceI18n.t("btn.report.tooltip")));
+            btnReport.setStyle(
+                "-fx-background-color: transparent;"
+              + "-fx-cursor: hand;"
+              + "-fx-padding: 0 4 0 4;"
+            );
+            btnReport.setOnMouseEntered(e -> btnReport.setTextFill(Color.web(BLUE)));
+            btnReport.setOnMouseExited(e  -> btnReport.setTextFill(Color.web(TEXT_MUTED)));
+            btnReport.setOnAction(e -> controller.generateActivityReport());
+
+            header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, btnPush, btnReplay, btnGraph, btnReport, dashboard, batchBtn, reset, gear);
         } else {
             header.getChildren().addAll(logoView, titleBlock, spacer, btnRecord, dashboard, batchBtn, reset, gear);
         }

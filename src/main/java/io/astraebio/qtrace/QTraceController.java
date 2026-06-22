@@ -667,6 +667,42 @@ public class QTraceController {
           });
     }
 
+    /** Generates an LLM activity report for the current image's .qtrace (Enterprise feature). */
+    public void generateActivityReport() {
+        QTracePlugin ep = QTracePluginManager.getEntitled();
+        if (ep == null) return;
+        if (qupath.getProject() == null) {
+            showGraphInfo(QTraceI18n.t("graph.info.noproject"));
+            return;
+        }
+        if (qupath.getImageData() == null) {
+            showGraphInfo(QTraceI18n.t("graph.info.noimage"));
+            return;
+        }
+        File qtrace = currentQtraceFile();
+        if (qtrace == null) {
+            showGraphInfo(QTraceI18n.t("report.info.noqtrace"));
+            return;
+        }
+        if (panel != null) panel.log("📄 " + QTraceI18n.t("report.generating"));
+        ep.generateActivityReport(qtrace.toPath())
+          .thenAccept(markdown -> Platform.runLater(() -> {
+              if (markdown == null || markdown.isBlank()) {
+                  if (panel != null) panel.log("📄 " + QTraceI18n.t("report.failed"));
+              } else {
+                  if (panel != null) panel.log("📄 " + QTraceI18n.t("report.ready"));
+                  ReportDialog.show(qupath.getStage(), qtrace.toPath(), markdown,
+                      msg -> { if (panel != null) panel.log("📄 " + msg); });
+              }
+          }))
+          .exceptionally(t -> {
+              Platform.runLater(() -> {
+                  if (panel != null) panel.log("📄 " + QTraceI18n.t("report.error") + ": " + t.getMessage());
+              });
+              return null;
+          });
+    }
+
     // ── Import .qTrace (Enterprise stub) ─────────────────────────────────────
 
     public void importAndReplay() {

@@ -70,4 +70,16 @@ public interface QTracePlugin {
             Collection<ClassifierRecord> classifiers) {
         return CompletableFuture.completedFuture(null);
     }
+
+    /**
+     * Generates a human-readable activity report (Markdown) from a .qtrace file.
+     * Builds a compact digest locally (the raw .qtrace can be tens of MB) and POSTs
+     * it to the qtrace.ca portal, which calls an LLM and returns the report.
+     * Auth: reads the .qtlicense JWT from QTraceConfig and sends it as a bearer token.
+     * Returns a CompletableFuture resolving to the Markdown report, or null on
+     * failure / not supported.
+     */
+    default CompletableFuture<String> generateActivityReport(Path qtraceFile) {
+        return CompletableFuture.completedFuture(null);
+    }
 }
