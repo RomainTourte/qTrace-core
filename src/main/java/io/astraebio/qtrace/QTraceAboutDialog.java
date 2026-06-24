@@ -16,8 +16,6 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import qupath.lib.gui.QuPathGUI;
 
-import java.awt.Desktop;
-import java.net.URI;
 
 public class QTraceAboutDialog {
 
@@ -464,8 +462,15 @@ public class QTraceAboutDialog {
 
     private static void openUrl(String url) {
         try {
-            if (Desktop.isDesktopSupported())
-                Desktop.getDesktop().browse(new URI(url));
+            String os = System.getProperty("os.name", "").toLowerCase();
+            ProcessBuilder pb;
+            if (os.contains("linux"))
+                pb = new ProcessBuilder("xdg-open", url);
+            else if (os.contains("mac"))
+                pb = new ProcessBuilder("open", url);
+            else
+                pb = new ProcessBuilder("cmd", "/c", "start", url);
+            pb.start();
         } catch (Exception ignored) {}
     }
 }
