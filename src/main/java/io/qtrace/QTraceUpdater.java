@@ -68,7 +68,7 @@ public final class QTraceUpdater {
         "https://qtrace.ca/api/download/compliance/licensed";
 
     private static final Pattern JAR_VERSION =
-        Pattern.compile("^qtrace-(?:core|compliance|enterprise)-(\\d+(?:\\.\\d+)*)\\.jar$");
+        Pattern.compile("^qtrace-(?:core|compliance)-(\\d+(?:\\.\\d+)*)\\.jar$");
 
     @FunctionalInterface
     public interface Downloader { byte[] download() throws Exception; }
@@ -139,8 +139,7 @@ public final class QTraceUpdater {
                 byte[] mb = httpGetBytes(VERSION_URL, null);
                 JsonObject manifest = JsonParser
                     .parseString(new String(mb, StandardCharsets.UTF_8)).getAsJsonObject();
-                // Support both old "enterprise" key and new "compliance" key in manifest
-                String manifestKey = manifest.has("compliance") ? "compliance" : "enterprise";
+                String manifestKey = "compliance";
                 if (!manifest.has(manifestKey)) return;
                 JsonObject ent = manifest.getAsJsonObject(manifestKey);
                 String remoteVer = ent.has("version") ? ent.get("version").getAsString() : null;
