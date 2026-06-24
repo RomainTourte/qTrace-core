@@ -3,7 +3,7 @@ plugins {
     id 'org.openjfx.javafxplugin' version '0.1.0'
 }
 
-group   = 'io.astraebio.qtrace'
+group = 'io.qtrace'
 version = '1.0.7'
 
 java {
