@@ -29,7 +29,7 @@ Outputs:
 
 Cryptographic certification (Ed25519 + OpenTimestamps), contributor identity
 verification, and blockchain anchoring require **qTrace Enterprise** —
-contact [mckeeinformatics.com](https://mckeeinformatics.com).
+contact [Tourte Romain](mailto:tourteromain@gmail.com).
 
 ## License
 
