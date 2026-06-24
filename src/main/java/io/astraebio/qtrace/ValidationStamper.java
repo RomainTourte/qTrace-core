@@ -72,7 +72,7 @@ public class ValidationStamper {
               + "-fx-opacity: 1;"
             );
             validatorField.setTooltip(new javafx.scene.control.Tooltip(
-                "Identity locked — certified by your qTrace Enterprise license.\n"
+                "Identity locked — certified by your qTrace Compliance license.\n"
               + "Institution: " + activeLicense.institution() + "\n"
               + "Valid until: " + activeLicense.expiresAtFormatted()
             ));

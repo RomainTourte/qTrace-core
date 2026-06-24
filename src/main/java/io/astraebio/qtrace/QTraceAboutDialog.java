@@ -35,7 +35,7 @@ public class QTraceAboutDialog {
     private static final String ORANGE     = "#fab387";
     private static final String RED        = "#f38ba8";   // invalid/tampered license
 
-    private static final String WEBSITE    = "https://astraebio.com";
+    private static final String WEBSITE    = "https://qtrace.ca";
     private static final String PORTAL_URL = "https://qtrace.ca/portal";
 
     enum Mode { CORE, ENTERPRISE, CERTIFIED }
@@ -134,9 +134,9 @@ public class QTraceAboutDialog {
             case ENTERPRISE -> YELLOW;
             case CERTIFIED  -> GREEN;
         };
-        String badgeText   = inactive ? "Enterprise — " + inactiveWord() : switch (mode) {
+        String badgeText   = inactive ? "Compliance — " + inactiveWord() : switch (mode) {
             case CORE       -> "Core";
-            case ENTERPRISE -> "Enterprise";
+            case ENTERPRISE -> "Compliance";
             case CERTIFIED  -> "✓ Certified";
         };
 
@@ -165,7 +165,7 @@ public class QTraceAboutDialog {
         box.getChildren().addAll(nameRow, version, tagline);
 
         if (inactive) {
-            Label warn = new Label("⚠ Your qTrace Enterprise license is no longer active — running in Core mode.");
+            Label warn = new Label("⚠ Your qTrace Compliance license is no longer active — running in Core mode.");
             warn.setTextFill(Color.web(inactiveColor()));
             warn.setFont(Font.font("System", FontWeight.BOLD, 11));
             warn.setWrapText(true);
@@ -221,9 +221,11 @@ public class QTraceAboutDialog {
         return card;
     }
 
-    // ── Feature comparison grid ───────────────────────────────────────────────
+    // ── Feature grid ─────────────────────────────────────────────────────────
 
     private static GridPane buildFeatureGrid(Mode mode) {
+        boolean isCompliance = (mode != Mode.CORE);
+
         GridPane g = new GridPane();
         g.setHgap(12);
         g.setVgap(6);
@@ -231,77 +233,88 @@ public class QTraceAboutDialog {
 
         ColumnConstraints featureCol = new ColumnConstraints();
         featureCol.setHgrow(Priority.ALWAYS);
-        ColumnConstraints coreCol = new ColumnConstraints(56);
-        coreCol.setHalignment(HPos.CENTER);
-        ColumnConstraints entCol = new ColumnConstraints(76);
-        entCol.setHalignment(HPos.CENTER);
-        ColumnConstraints certCol = new ColumnConstraints(72);
-        certCol.setHalignment(HPos.CENTER);
-        g.getColumnConstraints().addAll(featureCol, coreCol, entCol, certCol);
+        ColumnConstraints checkCol = new ColumnConstraints(40);
+        checkCol.setHalignment(HPos.CENTER);
+        g.getColumnConstraints().addAll(featureCol, checkCol);
 
         int row = 0;
 
-        // Column headers — active column highlighted
-        Label entHeader  = colHeader("Enterprise", mode == Mode.ENTERPRISE ? YELLOW : TEXT_MUTED);
-        Label certHeader = colHeader("Certified",  mode == Mode.CERTIFIED  ? GREEN  : TEXT_MUTED);
-        g.add(colHeader("", TEXT_MUTED), 0, row);
-        g.add(colHeader("Core",  mode == Mode.CORE ? BLUE : TEXT_MUTED), 1, row);
-        g.add(entHeader,  2, row);
-        g.add(certHeader, 3, row);
-        row++;
-
-        Region r0 = gridRule(); g.add(r0, 0, row); GridPane.setColumnSpan(r0, 4); row++;
-
-        // Shared by all editions
-        String[] shared = {
+        // Core features — available in all editions
+        String[] core = {
             "Workflow step capture (real-time)",
             "Reproducible Meta-Script (Groovy)",
             "Git versioning via JGit",
-            ".qtrace JSON audit trail export",
+            ".qtrace JSON audit trail",
             "English / French UI",
         };
-        for (String feat : shared) {
+        for (String feat : core) {
             g.add(featureLabel(feat, false), 0, row);
-            g.add(check(true,  BLUE),   1, row);
-            g.add(check(true,  YELLOW), 2, row);
-            g.add(check(true,  GREEN),  3, row);
+            g.add(check(true, isCompliance ? TEAL : BLUE), 1, row);
             row++;
         }
 
-        Region r1 = gridRule(); g.add(r1, 0, row); GridPane.setColumnSpan(r1, 4); row++;
+        Region r1 = gridRule(); g.add(r1, 0, row); GridPane.setColumnSpan(r1, 2); row++;
 
-        // Enterprise + Certified
-        String[] enterprise = {
+        // Compliance features — available only with active subscription
+        String[] complianceFeatures = {
             "Dashboard — multi-image viewer",
             "Batch export for full cohorts",
             "Validation Stamp (expert sign-off)",
-            "Priority support by AstraeBio",
+            "ED25519 cryptographic signing",
+            "Chain-of-custody certificates (.qtcert)",
+            "Bitcoin-anchored timestamps (OTS)",
+            "Identity-certified validator stamps",
+            "Validator name locked in stamp",
+            "Priority support by qtrace.ca",
         };
-        for (String feat : enterprise) {
-            g.add(featureLabel(feat, mode == Mode.CORE), 0, row);
-            g.add(check(false, BLUE),   1, row);
-            g.add(check(true,  YELLOW), 2, row);
-            g.add(check(true,  GREEN),  3, row);
+        for (String feat : complianceFeatures) {
+            g.add(featureLabel(feat, !isCompliance), 0, row);
+            g.add(check(isCompliance, TEAL), 1, row);
             row++;
         }
 
-        Region r2 = gridRule(); g.add(r2, 0, row); GridPane.setColumnSpan(r2, 4); row++;
+        // Compliance standards — only shown in Compliance edition
+        if (isCompliance) {
+            Region r2 = gridRule(); g.add(r2, 0, row); GridPane.setColumnSpan(r2, 2); row++;
 
-        // Certified only
-        String[] certified = {
-            "Identity-certified stamps",
-            "Validator name locked in stamp",
-        };
-        for (String feat : certified) {
-            boolean dimmed = mode != Mode.CERTIFIED;
-            g.add(featureLabel(feat, dimmed), 0, row);
-            g.add(check(false, BLUE),   1, row);
-            g.add(check(false, YELLOW), 2, row);
-            g.add(check(true,  GREEN),  3, row);
-            row++;
+            Label sectionTitle = new Label("Compliance Coverage");
+            sectionTitle.setFont(Font.font("System", FontWeight.BOLD, 10));
+            sectionTitle.setTextFill(Color.web(TEXT_MUTED));
+            sectionTitle.setPadding(new Insets(4, 0, 4, 0));
+            g.add(sectionTitle, 0, row); GridPane.setColumnSpan(sectionTitle, 2); row++;
+
+            String[][] standards = {
+                {"ISO 15189 §5.8",     "Traceability of examination processes"},
+                {"FDA 21 CFR Part 11", "Electronic records & electronic signatures"},
+                {"CAP",                "Laboratory accreditation documentation"},
+                {"GLP / OECD",         "Method reproducibility & data integrity"},
+                {"CLIA",               "Quality assessment documentation"},
+            };
+            for (String[] std : standards) {
+                HBox indicator = complianceIndicator(std[0], std[1]);
+                g.add(indicator, 0, row); GridPane.setColumnSpan(indicator, 2); row++;
+            }
         }
 
         return g;
+    }
+
+    private static HBox complianceIndicator(String standard, String description) {
+        Label dot = new Label("●");
+        dot.setTextFill(Color.web(TEAL));
+        dot.setFont(Font.font("System", 10));
+
+        Label stdLabel = new Label(standard);
+        stdLabel.setFont(Font.font("System", FontWeight.BOLD, 11));
+        stdLabel.setTextFill(Color.web(TEAL));
+
+        Label descLabel = new Label("— " + description);
+        descLabel.setFont(Font.font("System", 11));
+        descLabel.setTextFill(Color.web(TEXT_MUTED));
+
+        HBox box = new HBox(6, dot, stdLabel, descLabel);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
@@ -316,11 +329,11 @@ public class QTraceAboutDialog {
         );
 
         String licenseText = switch (mode) {
-            case CORE       -> "·  Apache 2.0 License";
+            case CORE       -> "·  GPL v3";
             case ENTERPRISE -> "·  Commercial License";
             case CERTIFIED  -> "·  Commercial License";
         };
-        Label copy    = muted("© 2025 AstraeBio");
+        Label copy    = muted("© 2026 qTrace");
         Label license = muted(licenseText);
 
         Region spacer = new Region();
@@ -343,7 +356,7 @@ public class QTraceAboutDialog {
             renew.setOnAction(e -> openUrl(PORTAL_URL));
             footer.getChildren().add(renew);
         } else if (mode == Mode.CORE) {
-            Button upgrade = new Button("Get Enterprise ↑");
+            Button upgrade = new Button("Get Compliance ↑");
             upgrade.setStyle(
                 "-fx-background-color: " + YELLOW + "22;"
               + "-fx-border-color: " + YELLOW + "66;"

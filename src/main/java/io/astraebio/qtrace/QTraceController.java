@@ -57,7 +57,7 @@ public class QTraceController {
         if (ep != null) {
             String epVersion = ep.getPluginVersion();
             String v = epVersion != null ? epVersion : VERSION;
-            return "qTrace Enterprise" + entitlementSuffix() + "  v" + v;
+            return "qTrace Compliance" + entitlementSuffix() + "  v" + v;
         }
         return "qTrace Core  v" + VERSION;
     }

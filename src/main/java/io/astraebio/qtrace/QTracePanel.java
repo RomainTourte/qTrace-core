@@ -107,7 +107,7 @@ public class QTracePanel {
         ImageView logoView = logoView(28);
 
         String edition = QTracePluginManager.hasEnterprise()
-            ? "Enterprise" + QTraceController.entitlementSuffix()
+            ? "Compliance" + QTraceController.entitlementSuffix()
             : "Core";
         Text title = new Text("qTrace " + edition);
         title.setFont(Font.font("System", FontWeight.BOLD, 18));

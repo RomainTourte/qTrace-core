@@ -28,7 +28,7 @@ Outputs:
 ## Enterprise features
 
 Cryptographic certification (Ed25519 + OpenTimestamps), contributor identity
-verification, and blockchain anchoring require **qTrace Enterprise** —
+verification, and blockchain anchoring require **qTrace Compliance** —
 contact [Tourte Romain](mailto:tourteromain@gmail.com).
 
 ## License
