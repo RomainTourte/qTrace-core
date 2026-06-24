@@ -29,7 +29,7 @@ Outputs:
 
 Cryptographic certification (Ed25519 + OpenTimestamps), contributor identity
 verification, and blockchain anchoring require **qTrace Compliance** —
-contact [Tourte Romain](mailto:tourteromain@gmail.com).
+visit [qtrace.ca](https://qtrace.ca) or contact [Romain Tourte](mailto:tourteromain@gmail.com)
 
 ## License
 
