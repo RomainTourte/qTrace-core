@@ -65,7 +65,7 @@ public class QTracePanel {
 
     // Record button (header)
     private Button   btnRecord;
-    // Cloud push button (Enterprise only)
+    // Cloud push button (Compliance only)
     private Button   btnPush;
 
     // Log
@@ -125,7 +125,7 @@ public class QTracePanel {
 
         ImageView logoView = logoView(28);
 
-        String edition = QTracePluginManager.hasEnterprise()
+        String edition = QTracePluginManager.hasCompliance()
             ? "Compliance" + QTraceController.entitlementSuffix()
             : "Core";
         Text title = new Text("qTrace " + edition);
@@ -136,7 +136,7 @@ public class QTracePanel {
         sub.setFont(Font.font("System", 11));
         sub.setFill(Color.web(TEXT_MUTED));
 
-        // Enterprise header line: green "✓ Name" when licensed & active,
+        // Compliance header line: green "✓ Name" when licensed & active,
         // amber "⚠ License expired — renew" when the JAR is present but not entitled.
         String licenseeLine = null;
         boolean licenseWarn = false;
@@ -144,7 +144,7 @@ public class QTracePanel {
         if (entitled != null) {
             LicenseInfo li = entitled.getActiveLicenseInfo();
             if (li != null) licenseeLine = "✓ " + li.name();
-        } else if (QTracePluginManager.hasEnterprise()) {
+        } else if (QTracePluginManager.hasCompliance()) {
             licenseeLine = "⚠ " + QTraceI18n.t("license.inactive.header");
             licenseWarn = true;
         }
@@ -237,7 +237,7 @@ public class QTracePanel {
         gear.setOnMouseExited(e  -> gear.setTextFill(Color.web(TEXT_MUTED)));
         gear.setOnAction(e -> QTraceSettingsDialog.show(stage));
 
-        // Cloud workspace push + Replay + Graph — Enterprise, only when licensed & active.
+        // Cloud workspace push + Replay + Graph — Compliance, only when licensed & active.
         // When the license is inactive the panel degrades to the Core button set.
         if (QTracePluginManager.isEntitled()) {
             btnPush = new Button("☁");
@@ -563,7 +563,7 @@ public class QTracePanel {
         });
     }
 
-    /** Enable/disable the ☁ push button (Enterprise only — no-op in Core). */
+    /** Enable/disable the ☁ push button (Compliance only — no-op in Core). */
     public void setPushEnabled(boolean enabled) {
         if (btnPush == null) return;
         Platform.runLater(() -> {

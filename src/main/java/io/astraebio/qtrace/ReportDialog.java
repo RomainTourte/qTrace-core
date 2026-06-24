@@ -40,7 +40,7 @@ import java.nio.file.Path;
 import java.util.function.Consumer;
 
 /**
- * Read-only preview window for an Enterprise activity report (Markdown).
+ * Read-only preview window for an Compliance activity report (Markdown).
  * Phase 1: shows the raw Markdown in a monospace text area with a "Save (.md)"
  * button that writes next to the source .qtrace. A richer rendering / PDF export
  * is planned for phase 2.

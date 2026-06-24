@@ -40,7 +40,7 @@ import javafx.stage.Window;
 /**
  * Pre-send confirmation for the activity report: shows the user the exact digest
  * that would leave their machine (audit/transparency) before anything is sent to
- * the report endpoint. Enterprise-only flow.
+ * the report endpoint. Compliance-only flow.
  *
  * Returns a {@link Result}: whether to proceed, and whether to stop asking
  * (re-enableable in Settings → Security).

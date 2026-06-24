@@ -128,7 +128,7 @@ public class QTraceSettingsDialog {
         validatorHint.setWrapText(true);
         validatorHint.setMaxWidth(440);
 
-        // ── Enterprise License section ─────────────────────────────────────────
+        // ── Compliance License section ─────────────────────────────────────────
         TextField tfLicense = new TextField(cfg.getLicensePath());
         tfLicense.setPromptText("(no license loaded)");
         tfLicense.setPrefHeight(30);
@@ -287,7 +287,7 @@ public class QTraceSettingsDialog {
             sectionTitle("Validator"),
             validatorGrid, validatorHint,
             sep2,
-            sectionTitle("Enterprise License"),
+            sectionTitle("Compliance License"),
             licenseGrid,
             sep3,
             sectionTitle(QTraceI18n.t("settings.security.tab")),
@@ -403,7 +403,7 @@ public class QTraceSettingsDialog {
         try {
             QTracePlugin enterprise = QTracePluginManager.get();
             if (enterprise == null) {
-                statusLbl.setText("Enterprise plugin not installed.");
+                statusLbl.setText("Compliance plugin not installed.");
                 statusLbl.setTextFill(Color.web(ORANGE));
                 return;
             }

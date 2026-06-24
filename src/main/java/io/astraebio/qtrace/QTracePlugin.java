@@ -28,11 +28,11 @@ import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Service interface implemented by the Enterprise module.
+ * Service interface implemented by the Compliance module.
  * Discovered at runtime via ServiceLoader — if no enterprise JAR is present,
  * QTracePluginManager.get() returns null and premium features are silently absent.
  *
- * Enterprise features: cryptographic certification (Ed25519 + OpenTimestamps),
+ * Compliance features: cryptographic certification (Ed25519 + OpenTimestamps),
  * contributor identity verification, blockchain anchoring (planned v0.7.0).
  * All methods are default no-ops for forward compatibility.
  */
@@ -46,7 +46,7 @@ public interface QTracePlugin {
      * Returns a decoded {@link LicenseInfo} if the signature is valid and the token is not expired,
      * or null if the token is invalid.
      */
-    /** Returns the Enterprise plugin version string, e.g. "1.0.2". */
+    /** Returns the Compliance plugin version string, e.g. "1.0.2". */
     default String getPluginVersion() { return null; }
 
     default LicenseInfo validateLicense(String token) { return null; }

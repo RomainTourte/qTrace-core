@@ -92,7 +92,7 @@ public class QTraceConfig {
     public String getValidatorName()        { return validatorName != null ? validatorName : ""; }
     public void   setValidatorName(String v){ this.validatorName = blank(v); }
 
-    // ── Enterprise license ────────────────────────────────────────────────────
+    // ── Compliance license ────────────────────────────────────────────────────
 
     public String getLicensePath()         { return licensePath != null ? licensePath : ""; }
     public void   setLicensePath(String p) { this.licensePath = blank(p); }

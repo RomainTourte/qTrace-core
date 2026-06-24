@@ -44,7 +44,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Startup update mechanism shared by Core (public GitHub) and Enterprise (qtrace.ca).
+ * Startup update mechanism shared by Core (public GitHub) and Compliance (qtrace.ca).
  *
  * Design (decided with the maintainer):
  *  - Never silent: the user is prompted before anything is downloaded/installed.
@@ -120,15 +120,15 @@ public final class QTraceUpdater {
         });
     }
 
-    // ── Enterprise check (driven by Core, works with any enterprise JAR) ─────────
+    // ── Compliance check (driven by Core, works with any enterprise JAR) ─────────
 
     /**
-     * Async, safe. Offers an Enterprise update based on the qtrace.ca manifest.
+     * Async, safe. Offers an Compliance update based on the qtrace.ca manifest.
      * Driven by the Core (not the enterprise JAR) so it works even when the
      * installed enterprise JAR predates the auto-update feature — it only reads
      * the loaded plugin's reported version and the license from config.
      */
-    public static void checkEnterprise(QuPathGUI qupath, QTracePlugin ep) {
+    public static void checkCompliance(QuPathGUI qupath, QTracePlugin ep) {
         if (ep == null || !QTraceConfig.get().isUpdateCheckEnabled()) return;
         final String currentVer = ep.getPluginVersion();
         CompletableFuture.runAsync(() -> {
@@ -182,7 +182,7 @@ public final class QTraceUpdater {
         if (remoteVer.equals(QTraceConfig.get().getDismissedUpdateVersion())) return;
 
         Platform.runLater(() -> {
-            String label = "core".equals(module) ? "Core" : "Enterprise";
+            String label = "core".equals(module) ? "Core" : "Compliance";
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
             alert.setTitle(QTraceI18n.t("update.title"));
             alert.setHeaderText(QTraceI18n.t("update.available")

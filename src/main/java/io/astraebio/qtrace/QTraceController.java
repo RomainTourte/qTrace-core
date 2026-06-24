@@ -86,7 +86,7 @@ public class QTraceController {
      * " (corrupted)" / " (expired)" / " (inactive)" depending on why it was downgraded.
      */
     static String entitlementSuffix() {
-        if (!QTracePluginManager.hasEnterprise() || QTracePluginManager.isEntitled()) return "";
+        if (!QTracePluginManager.hasCompliance() || QTracePluginManager.isEntitled()) return "";
         String r = QTracePluginManager.inactiveReason();
         if ("corrupted".equals(r)) return " (corrupted)";
         if ("expired".equals(r))   return " (expired)";
@@ -95,7 +95,7 @@ public class QTraceController {
 
     /** True when the inactive state is a security failure (invalid/tampered signature) → show red. */
     static boolean entitlementIsError() {
-        return QTracePluginManager.hasEnterprise()
+        return QTracePluginManager.hasCompliance()
             && !QTracePluginManager.isEntitled()
             && "corrupted".equals(QTracePluginManager.inactiveReason());
     }
@@ -103,7 +103,7 @@ public class QTraceController {
     /**
      * Authoritative contributor identity for action attribution (one commit = one author).
      * Resolution order:
-     *   1. valid Enterprise license holder (certified identity),
+     *   1. valid Compliance license holder (certified identity),
      *   2. configured validator name in QTraceConfig,
      *   3. OS login (System property user.name).
      * The OS login + machine are always kept separately for forensics; this is the
@@ -207,7 +207,7 @@ public class QTraceController {
         }
     }
 
-    /** Opens the commit-graph window for the current image's .qtrace (Enterprise feature). */
+    /** Opens the commit-graph window for the current image's .qtrace (Compliance feature). */
     public void showCommitGraph() {
         // Nothing to graph until there is a project, an open image, and at least one stamp (.qtrace).
         if (qupath.getProject() == null) {
@@ -401,7 +401,7 @@ public class QTraceController {
         }
     }
 
-    // ── Replay (Enterprise) ──────────────────────────────────────────────────
+    // ── Replay (Compliance) ──────────────────────────────────────────────────
 
     public void openReplayDialog() {
         QTracePlugin ep = QTracePluginManager.getEntitled();
@@ -613,7 +613,7 @@ public class QTraceController {
                 panel.log("  CSV: " + csvFile.getFileName());
             }
 
-            // Enterprise: build .qtcert chain-of-custody certificate (only when licensed & active)
+            // Compliance: build .qtcert chain-of-custody certificate (only when licensed & active)
             QTracePlugin ep = QTracePluginManager.getEntitled();
             lastQtracePath = outFile;
             lastCertPath   = null;
@@ -640,7 +640,7 @@ public class QTraceController {
         }
     }
 
-    // ── Cloud workspace push (Enterprise) ────────────────────────────────────
+    // ── Cloud workspace push (Compliance) ────────────────────────────────────
 
     public void pushToWorkspace() {
         QTracePlugin ep = QTracePluginManager.getEntitled();
@@ -688,7 +688,7 @@ public class QTraceController {
           });
     }
 
-    /** Generates an LLM activity report for the current image's .qtrace (Enterprise feature). */
+    /** Generates an LLM activity report for the current image's .qtrace (Compliance feature). */
     public void generateActivityReport() {
         QTracePlugin ep = QTracePluginManager.getEntitled();
         if (ep == null) return;
@@ -774,7 +774,7 @@ public class QTraceController {
         }
     }
 
-    // ── Import .qTrace (Enterprise stub) ─────────────────────────────────────
+    // ── Import .qTrace (Compliance stub) ─────────────────────────────────────
 
     public void importAndReplay() {
         QTracePlugin plugin = QTracePluginManager.getEntitled();

@@ -70,7 +70,7 @@ public class ValidationStamper {
         }
 
         // ── Form fields ──────────────────────────────────────────────────────
-        // If Enterprise + valid license: identity is locked to the license holder
+        // If Compliance + valid license: identity is locked to the license holder
         LicenseInfo activeLicense = null;
         if (ep != null) activeLicense = ep.getActiveLicenseInfo();
 
@@ -123,7 +123,7 @@ public class ValidationStamper {
         notesArea.setPrefRowCount(3);
         notesArea.setWrapText(true);
 
-        // Attestation checkbox only shown when Enterprise is present (signing has legal meaning)
+        // Attestation checkbox only shown when Compliance is present (signing has legal meaning)
         CheckBox attestationBox = ep != null ? new CheckBox(ValidationStamp.SIGNING_MEANING) : null;
         if (attestationBox != null) {
             attestationBox.setWrapText(true);
@@ -193,7 +193,7 @@ public class ValidationStamper {
         dialog.getDialogPane().setContent(grid);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
-        // Enterprise: OK blocked until validator named AND attestation checked (21 CFR §11.50)
+        // Compliance: OK blocked until validator named AND attestation checked (21 CFR §11.50)
         // Core: OK blocked only until validator name entered (no cryptographic signing)
         Node okBtn = dialog.getDialogPane().lookupButton(ButtonType.OK);
         Runnable updateOk = () -> okBtn.setDisable(

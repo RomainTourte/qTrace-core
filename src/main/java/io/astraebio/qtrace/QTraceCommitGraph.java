@@ -52,7 +52,7 @@ import java.util.List;
  * the contributor and the categorized actions of that commit (from the {@code contributions}
  * block, which already excludes pre-tracking steps inherited from a prior contributor).
  *
- * Enterprise-only feature (opened from the panel), but lives in Core as it only reads JSON.
+ * Compliance-only feature (opened from the panel), but lives in Core as it only reads JSON.
  */
 public class QTraceCommitGraph {
 

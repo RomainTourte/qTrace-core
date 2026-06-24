@@ -203,7 +203,7 @@ public class QTraceExporter {
         JsonObject session = new JsonObject();
 
         session.addProperty("session_id",     UUID.randomUUID().toString());
-        // Authoritative contributor (one commit = one author): Enterprise license → config → OS login.
+        // Authoritative contributor (one commit = one author): Compliance license → config → OS login.
         session.addProperty("user",           QTraceController.currentContributor());
         session.addProperty("os_user",        System.getProperty("user.name", "unknown"));  // forensic
         session.addProperty("machine",        getHostname());

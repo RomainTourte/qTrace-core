@@ -46,15 +46,15 @@ public final class StampSigner {
     /**
      * Signs the stamp's canonical payload and returns the signature as base64url.
      * Priority:
-     *   1. In-memory decrypted key from Enterprise plugin (passphrase-unlocked).
+     *   1. In-memory decrypted key from Compliance plugin (passphrase-unlocked).
      *   2. Key file on disk (legacy path via QTraceConfig / ~/.qTrace/qtrace-signing.key).
      * Returns null silently if no signing key is available.
      */
     public static String sign(ValidationStamp stamp) {
-        // Enterprise installed but license inactive → degrade to Core: no certification at all.
-        if (QTracePluginManager.hasEnterprise() && !QTracePluginManager.isEntitled()) return null;
+        // Compliance installed but license inactive → degrade to Core: no certification at all.
+        if (QTracePluginManager.hasCompliance() && !QTracePluginManager.isEntitled()) return null;
 
-        // 1. Try in-memory decrypted key (Enterprise, passphrase-protected .qtlicense)
+        // 1. Try in-memory decrypted key (Compliance, passphrase-protected .qtlicense)
         QTracePlugin ep = QTracePluginManager.getEntitled();
         if (ep != null) {
             String decryptedKey = ep.getDecryptedSigningKey();

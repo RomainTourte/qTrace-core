@@ -21,7 +21,7 @@ package io.astraebio.qtrace;
 
 public final class QTracePluginManager {
     private static QTracePlugin plugin = null;
-    // Optimistic by default: Enterprise stays active until a *certain* signal
+    // Optimistic by default: Compliance stays active until a *certain* signal
     // (offline-expired license, or server says inactive) downgrades it. A network
     // error never flips this — an offline pathologist keeps certification.
     private static volatile boolean entitled = true;
@@ -33,14 +33,14 @@ public final class QTracePluginManager {
     public static void register(QTracePlugin p) { plugin = p; }
     public static QTracePlugin get()            { return plugin; }
 
-    /** True if the Enterprise JAR is loaded (regardless of license state). */
-    public static boolean hasEnterprise()       { return plugin != null; }
+    /** True if the Compliance JAR is loaded (regardless of license state). */
+    public static boolean hasCompliance()       { return plugin != null; }
 
-    /** True when Enterprise features (certification & compliance) are licensed and active. */
+    /** True when Compliance features (certification & compliance) are licensed and active. */
     public static boolean isEntitled()          { return plugin != null && entitled; }
 
     /**
-     * The plugin only when entitled — use this to gate Enterprise *features*
+     * The plugin only when entitled — use this to gate Compliance *features*
      * (signing, push, identity lock, PIN). Use {@link #get()} for things that must
      * keep working regardless of license state (version, update & license checks).
      */

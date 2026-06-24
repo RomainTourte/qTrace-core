@@ -46,7 +46,7 @@ public class QTraceAboutDialog {
     private static final String TEXT_SUB   = "#a6adc8";
     private static final String TEXT_MUTED = "#6c7086";
     private static final String BLUE       = "#89b4fa";   // Core
-    private static final String YELLOW     = "#f9e2af";   // Enterprise
+    private static final String YELLOW     = "#f9e2af";   // Compliance
     private static final String GREEN      = "#a6e3a1";   // Certified
     private static final String TEAL       = "#94e2d5";
     private static final String ORANGE     = "#fab387";
@@ -58,18 +58,18 @@ public class QTraceAboutDialog {
     enum Mode { CORE, ENTERPRISE, CERTIFIED }
 
     public static void show(QuPathGUI qupath) {
-        boolean hasEnterprise = QTracePluginManager.hasEnterprise();
+        boolean hasCompliance = QTracePluginManager.hasCompliance();
         LicenseInfo activeLicense = null;
-        if (hasEnterprise) {
+        if (hasCompliance) {
             QTracePlugin ep = QTracePluginManager.get();
             if (ep != null) activeLicense = ep.getActiveLicenseInfo();
         }
-        Mode mode = !hasEnterprise ? Mode.CORE
+        Mode mode = !hasCompliance ? Mode.CORE
                   : (activeLicense != null ? Mode.CERTIFIED : Mode.ENTERPRISE);
 
-        // Enterprise JAR present but license inactive/expired (a license is configured
-        // yet not entitled) — signal the degraded state rather than a fresh Enterprise.
-        boolean inactive = hasEnterprise
+        // Compliance JAR present but license inactive/expired (a license is configured
+        // yet not entitled) — signal the degraded state rather than a fresh Compliance.
+        boolean inactive = hasCompliance
             && !QTracePluginManager.isEntitled()
             && !QTraceConfig.get().getLicensePath().isBlank();
 

@@ -35,7 +35,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Resolves whether the Enterprise edition is licensed & active at startup, and
+ * Resolves whether the Compliance edition is licensed & active at startup, and
  * downgrades to Core behaviour (no certification / compliance) when it is not.
  *
  * Two signals, in order of certainty:
@@ -44,9 +44,9 @@ import java.util.concurrent.CompletableFuture;
  *  2. Online — {@code GET /api/license/status} reports {@code active:false}
  *     (covers a cancelled subscription while the JWT is still within its window).
  *
- * A network error / offline state never downgrades — Enterprise stays active so an
+ * A network error / offline state never downgrades — Compliance stays active so an
  * offline pathologist keeps certification. When inactive, the user is told once at
- * startup (with a link to the portal) and Enterprise features are gated off via
+ * startup (with a link to the portal) and Compliance features are gated off via
  * {@link QTracePluginManager#setEntitled(boolean)}.
  */
 public final class QTraceLicenseGate {
@@ -107,7 +107,7 @@ public final class QTraceLicenseGate {
                         QTraceI18n.t("license.inactive.subscription"), Alert.AlertType.WARNING);
                 }
             } catch (Exception ignored) {
-                // offline / server error — keep Enterprise active (do not downgrade on uncertainty)
+                // offline / server error — keep Compliance active (do not downgrade on uncertainty)
             }
         });
     }

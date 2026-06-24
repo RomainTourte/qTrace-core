@@ -101,14 +101,14 @@ public class QTraceExtension implements QuPathExtension, GitHubProject {
         Platform.runLater(() -> addToolbarButton(qupath));
 
         // ── License entitlement (offline-certain part runs synchronously) ─────
-        // Downgrades Enterprise → Core when the license is expired/inactive, before
+        // Downgrades Compliance → Core when the license is expired/inactive, before
         // the panel is ever shown; the server confirmation runs async.
         QTraceLicenseGate.checkAtStartup(qupath, controller);
 
         // ── Startup update checks (async; user-validated, applied on restart) ──
         // Both checks are Core-driven so an old enterprise JAR still gets updated.
         QTraceUpdater.checkCore(qupath);
-        QTraceUpdater.checkEnterprise(qupath, QTracePluginManager.get());
+        QTraceUpdater.checkCompliance(qupath, QTracePluginManager.get());
     }
 
     private static String nz(String s) { return s != null ? s : "0"; }
