@@ -64,7 +64,8 @@ public class QTraceExtension implements QuPathExtension, GitHubProject {
         installed = true;
 
         // Best-effort cleanup of superseded JARs left by a previous auto-update.
-        QTraceUpdater.reapOldJars(QTraceExtension.class, "enterprise");
+        QTraceUpdater.reapOldJars(QTraceExtension.class, "compliance");
+        QTraceUpdater.reapOldJars(QTraceExtension.class, "enterprise"); // legacy name
         QTraceUpdater.reapOldJars(QTraceExtension.class, "core");
 
         // Register the highest-version QTracePlugin among those discovered — an update

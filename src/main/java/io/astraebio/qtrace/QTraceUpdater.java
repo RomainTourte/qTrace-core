@@ -64,11 +64,11 @@ public final class QTraceUpdater {
         "https://api.github.com/repos/RomainTourte/qTrace-core/releases/latest";
     private static final String VERSION_URL =
         "https://qtrace.ca/api/version";
-    private static final String ENT_DOWNLOAD_URL =
-        "https://qtrace.ca/api/download/enterprise/licensed";
+    private static final String COMP_DOWNLOAD_URL =
+        "https://qtrace.ca/api/download/compliance/licensed";
 
     private static final Pattern JAR_VERSION =
-        Pattern.compile("^qtrace-(?:core|enterprise)-(\\d+(?:\\.\\d+)*)\\.jar$");
+        Pattern.compile("^qtrace-(?:core|compliance|enterprise)-(\\d+(?:\\.\\d+)*)\\.jar$");
 
     @FunctionalInterface
     public interface Downloader { byte[] download() throws Exception; }
@@ -139,14 +139,16 @@ public final class QTraceUpdater {
                 byte[] mb = httpGetBytes(VERSION_URL, null);
                 JsonObject manifest = JsonParser
                     .parseString(new String(mb, StandardCharsets.UTF_8)).getAsJsonObject();
-                if (!manifest.has("enterprise")) return;
-                JsonObject ent = manifest.getAsJsonObject("enterprise");
+                // Support both old "enterprise" key and new "compliance" key in manifest
+                String manifestKey = manifest.has("compliance") ? "compliance" : "enterprise";
+                if (!manifest.has(manifestKey)) return;
+                JsonObject ent = manifest.getAsJsonObject(manifestKey);
                 String remoteVer = ent.has("version") ? ent.get("version").getAsString() : null;
                 String sha256    = ent.has("sha256")  ? ent.get("sha256").getAsString()  : null;
                 if (remoteVer == null) return;
 
-                Downloader dl = () -> httpGetBytes(ENT_DOWNLOAD_URL, jwt);
-                promptAndInstall(qupath, "enterprise", currentVer, remoteVer, sha256, dl);
+                Downloader dl = () -> httpGetBytes(COMP_DOWNLOAD_URL, jwt);
+                promptAndInstall(qupath, "compliance", currentVer, remoteVer, sha256, dl);
             } catch (Exception ignored) {
                 // offline / no license — stay silent
             }
