@@ -55,7 +55,7 @@ public class QTraceAboutDialog {
     private static final String WEBSITE    = "https://qtrace.ca";
     private static final String PORTAL_URL = "https://qtrace.ca/portal";
 
-    enum Mode { CORE, ENTERPRISE, CERTIFIED }
+    enum Mode { CORE, COMPLIANCE, CERTIFIED }
 
     public static void show(QuPathGUI qupath) {
         boolean hasCompliance = QTracePluginManager.hasCompliance();
@@ -65,7 +65,7 @@ public class QTraceAboutDialog {
             if (ep != null) activeLicense = ep.getActiveLicenseInfo();
         }
         Mode mode = !hasCompliance ? Mode.CORE
-                  : (activeLicense != null ? Mode.CERTIFIED : Mode.ENTERPRISE);
+                  : (activeLicense != null ? Mode.CERTIFIED : Mode.COMPLIANCE);
 
         // Compliance JAR present but license inactive/expired (a license is configured
         // yet not entitled) — signal the degraded state rather than a fresh Compliance.
@@ -148,12 +148,12 @@ public class QTraceAboutDialog {
 
         String badgeColor  = inactive ? inactiveColor() : switch (mode) {
             case CORE       -> BLUE;
-            case ENTERPRISE -> YELLOW;
+            case COMPLIANCE -> YELLOW;
             case CERTIFIED  -> GREEN;
         };
         String badgeText   = inactive ? "Compliance — " + inactiveWord() : switch (mode) {
             case CORE       -> "Core";
-            case ENTERPRISE -> "Compliance";
+            case COMPLIANCE -> "Compliance";
             case CERTIFIED  -> "✓ Certified";
         };
 
@@ -347,7 +347,7 @@ public class QTraceAboutDialog {
 
         String licenseText = switch (mode) {
             case CORE       -> "·  GPL v3";
-            case ENTERPRISE -> "·  Commercial License";
+            case COMPLIANCE -> "·  Commercial License";
             case CERTIFIED  -> "·  Commercial License";
         };
         Label copy    = muted("© 2026 qTrace");
@@ -384,7 +384,7 @@ public class QTraceAboutDialog {
             );
             upgrade.setOnAction(e -> openUrl(PORTAL_URL));
             footer.getChildren().add(upgrade);
-        } else if (mode == Mode.ENTERPRISE) {
+        } else if (mode == Mode.COMPLIANCE) {
             Button cert = new Button("Load license →");
             cert.setStyle(
                 "-fx-background-color: " + GREEN + "22;"
