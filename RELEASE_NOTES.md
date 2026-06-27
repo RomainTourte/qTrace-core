@@ -10,24 +10,24 @@ A non-intrusive dialog appears automatically:
 
 All corrections are exported to the `.qtrace` sidecar under `manual_detection_corrections[]`, with timestamp, author, deleted object UUIDs, centroid coordinates, and the justification note. Split operations (delete + re-draw) are recorded as type `"split"` with both `deleted[]` and `created[]` arrays.
 
-**Silent mode:** disable the prompt entirely via Settings → Capture → "Prompt for detection correction note". Events are still recorded — just without asking for a note each time.
+**Silent mode:** disable the prompt via Settings → Capture → "Prompt for detection correction note". Events are still recorded without asking.
 
 ### Fix — multi-detection deletion in QuPath 0.7
-QuPath 0.7 fires `OTHER_STRUCTURE_CHANGE` (not `REMOVED`) when the user deletes ≥ 3 objects via the confirmation dialog — with an empty `changed` list. This was a blind spot in qTrace's hierarchy listener.
+QuPath 0.7 fires `OTHER_STRUCTURE_CHANGE` (not `REMOVED`) when the user deletes ≥ 3 objects via the confirmation dialog — with an empty `changed` list, making the deletion invisible to standard hierarchy listeners.
 
-The fix uses a `PathObjectSelectionListener` to snapshot the selected detections before the dialog, then identifies removed objects by diffing against the hierarchy after the `OTHER_STRUCTURE_CHANGE` event. Deletions of 1–2 objects (no dialog) continue to use the direct `REMOVED` path.
+The fix uses a `PathObjectSelectionListener` to snapshot selected detections before the dialog opens, then identifies removed objects by diffing against the hierarchy after the event. Deletions of 1–2 objects (no dialog) continue to use the direct `REMOVED` path.
 
 ---
 
 ### Added
-- **Detection correction audit** — when the user manually deletes or splits detections, qTrace captures the event and optionally prompts for a justification note ("merged artifact", "two clearly distinct nuclei", etc.)
-  - Dialog shows count ("3 detections manually deleted") with an optional free-text note field
-  - Silent mode available: disable the prompt via Settings → Capture → "Prompt for detection correction note"
-  - Corrections exported to `.qtrace` sidecar under `manual_detection_corrections[]` with timestamp, author, deleted UUIDs, centroid coordinates, and note
-  - Split detection (delete + re-draw) recorded as type `"split"` with both `deleted[]` and `created[]` arrays
+- **Detection correction audit** — manual detection deletions and splits are captured with timestamp, author, deleted UUIDs, centroid coordinates, and an optional justification note
+  - Dialog: count heading + free-text note field + Save / Skip
+  - Silent mode: Settings → Capture → "Prompt for detection correction note"
+  - Exported to `.qtrace` under `manual_detection_corrections[]`
+  - Split (delete + re-draw) recorded as type `"split"` with `deleted[]` and `created[]`
 
 ### Fixed
-- **QuPath 0.7 multi-deletion event** — QuPath 0.7 fires `OTHER_STRUCTURE_CHANGE` with an empty `changed` list (instead of `REMOVED`) when the user deletes ≥ 3 objects via the confirmation dialog; qTrace now tracks the selection via `PathObjectSelectionListener` and identifies removed detections by diffing against the hierarchy after the event
+- **QuPath 0.7 multi-deletion event** — QuPath 0.7 fires `OTHER_STRUCTURE_CHANGE` with empty `changed` list for confirmed bulk deletions; qTrace now uses `PathObjectSelectionListener` snapshot + hierarchy diff to identify removed detections
 
 ---
 
