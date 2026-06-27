@@ -55,6 +55,7 @@ import qupath.lib.io.PathIO;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.hierarchy.events.PathObjectHierarchyEvent;
 import qupath.lib.objects.hierarchy.events.PathObjectHierarchyListener;
+import qupath.lib.objects.hierarchy.events.PathObjectSelectionListener;
 import qupath.lib.plugins.workflow.DefaultScriptableWorkflowStep;
 import qupath.lib.plugins.workflow.ScriptableWorkflowStep;
 import qupath.lib.plugins.workflow.Workflow;
@@ -144,6 +145,11 @@ public class ActionLogger implements WorkflowListener {
     private volatile boolean       detectionBatchPending      = false;
     private volatile long          lastDetectionEventTime     = 0;
     private static final long      DETECTION_BATCH_WINDOW_MS  = 400;
+    // Snapshot of selected detections — updated by the selection listener so that
+    // OTHER_STRUCTURE_CHANGE (the event QuPath 0.7 fires for confirmed multi-deletion)
+    // can identify which detections were just removed even though changed() is empty.
+    private final List<JsonObject>        lastSelectedDetections = new ArrayList<>();
+    private PathObjectSelectionListener   selectionListener      = null;
 
     private final PathObjectHierarchyListener hierarchyListener = event -> {
         var type      = event.getEventType();
@@ -192,13 +198,31 @@ public class ActionLogger implements WorkflowListener {
             }
         }
 
-        // Manual detection deletion
+        // Manual detection deletion — two cases depending on QuPath version/count:
+        // (a) REMOVED with detections in changed[] — direct deletion, no confirmation dialog
+        // (b) OTHER_STRUCTURE_CHANGE with changed[]empty — QuPath 0.7 fires this for bulk
+        //     deletion via the confirmation dialog; we identify deleted objects by comparing
+        //     the lastSelectedDetections snapshot (taken before the dialog) with the hierarchy.
         if (type == PathObjectHierarchyEvent.HierarchyEventType.REMOVED && !scriptRunning) {
             boolean any = false;
             for (PathObject obj : changed) {
                 if (obj.isDetection()) { pendingRemovedDetections.add(serializeDetectionEvent(obj)); any = true; }
             }
             if (any) scheduleDetectionBatch();
+        }
+
+        if (type == PathObjectHierarchyEvent.HierarchyEventType.OTHER_STRUCTURE_CHANGE
+                && !scriptRunning && changed.isEmpty() && !lastSelectedDetections.isEmpty()) {
+            Set<String> remaining = currentImageData.getHierarchy().getDetectionObjects()
+                .stream().map(o -> o.getID().toString()).collect(Collectors.toSet());
+            List<JsonObject> deleted = lastSelectedDetections.stream()
+                .filter(j -> !remaining.contains(j.get("uuid").getAsString()))
+                .collect(Collectors.toList());
+            lastSelectedDetections.clear();
+            if (!deleted.isEmpty()) {
+                pendingRemovedDetections.addAll(deleted);
+                scheduleDetectionBatch();
+            }
         }
 
         // Split fragments arriving in the same 400 ms window as a manual deletion
@@ -255,6 +279,13 @@ public class ActionLogger implements WorkflowListener {
 
         imageData.getHistoryWorkflow().addWorkflowListener(this);
         imageData.getHierarchy().addListener(hierarchyListener);
+        selectionListener = (selected, deselected, allSelected) -> {
+            lastSelectedDetections.clear();
+            if (allSelected != null)
+                for (PathObject obj : allSelected)
+                    if (obj.isDetection()) lastSelectedDetections.add(serializeDetectionEvent(obj));
+        };
+        imageData.getHierarchy().getSelectionModel().addPathObjectSelectionListener(selectionListener);
         startClassifierWatcher();
         startObjectClassifierWatcher();
 
@@ -296,7 +327,12 @@ public class ActionLogger implements WorkflowListener {
         if (currentImageData != null) {
             currentImageData.getHierarchy().removeListener(hierarchyListener);
             currentImageData.getHistoryWorkflow().removeWorkflowListener(this);
+            if (selectionListener != null)
+                currentImageData.getHierarchy().getSelectionModel()
+                    .removePathObjectSelectionListener(selectionListener);
         }
+        selectionListener = null;
+        lastSelectedDetections.clear();
         currentImageData      = null;
         imageHash             = null;
         lastKnownStepCount    = 0;
