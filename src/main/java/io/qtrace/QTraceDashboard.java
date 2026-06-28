@@ -138,6 +138,7 @@ public class QTraceDashboard {
     private final VBox classifiersCardContent;
     private final VBox cellIntensityCardContent;
     private final VBox annotationsCardContent;
+    private final VBox detectionCorrectionsCardContent;
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -159,12 +160,13 @@ public class QTraceDashboard {
         tableRows     = new VBox(0);
         scanPathLabel = lbl("", TEXT_MUTED, 10, FontWeight.NORMAL, true);
 
-        imageCardContent         = new VBox(6);
-        alignmentCardContent     = new VBox(6);
-        segmentationCardContent  = new VBox(6);
-        classifiersCardContent   = new VBox(6);
-        cellIntensityCardContent = new VBox(6);
-        annotationsCardContent   = new VBox(6);
+        imageCardContent                = new VBox(6);
+        alignmentCardContent            = new VBox(6);
+        segmentationCardContent         = new VBox(6);
+        classifiersCardContent          = new VBox(6);
+        cellIntensityCardContent        = new VBox(6);
+        annotationsCardContent          = new VBox(6);
+        detectionCorrectionsCardContent = new VBox(6);
 
         stage.setScene(new Scene(buildRoot()));
         clearDetail();
@@ -369,7 +371,8 @@ public class QTraceDashboard {
             wrapCard("🔬  Segmentation",                   segmentationCardContent),
             wrapCard("🧠  Classifiers Pixel",              classifiersCardContent),
             wrapCard("📊  Cell Intensity Classifications", cellIntensityCardContent),
-            wrapCard("👤  Annotations",                    annotationsCardContent)
+            wrapCard("👤  Annotations",                    annotationsCardContent),
+            wrapCard("✂  Corrections de détections",       detectionCorrectionsCardContent)
         );
         ScrollPane scroll = new ScrollPane(detail);
         scroll.setFitToWidth(true);
@@ -876,16 +879,18 @@ public class QTraceDashboard {
         buildClassifiersCard(session);
         buildCellIntensityCard(session);
         buildAnnotationsCard(root);
+        buildDetectionCorrectionsCard(root);
     }
 
     private void clearDetail() {
         selectedData = null;
-        setPlaceholder(imageCardContent,         "Select an image from the table above");
-        setPlaceholder(alignmentCardContent,     "");
-        setPlaceholder(segmentationCardContent,  "");
-        setPlaceholder(classifiersCardContent,   "");
-        setPlaceholder(cellIntensityCardContent, "");
-        setPlaceholder(annotationsCardContent,   "");
+        setPlaceholder(imageCardContent,                "Select an image from the table above");
+        setPlaceholder(alignmentCardContent,            "");
+        setPlaceholder(segmentationCardContent,         "");
+        setPlaceholder(classifiersCardContent,          "");
+        setPlaceholder(cellIntensityCardContent,        "");
+        setPlaceholder(annotationsCardContent,          "");
+        setPlaceholder(detectionCorrectionsCardContent, "");
     }
 
     // ── Delete .qtrace ────────────────────────────────────────────────────────
@@ -1487,6 +1492,105 @@ public class QTraceDashboard {
     }
 
     // ── Card 6 — Annotations ─────────────────────────────────────────────────
+
+    // ── Card 7 — Corrections de détections ───────────────────────────────────
+
+    private void buildDetectionCorrectionsCard(JsonObject root) {
+        detectionCorrectionsCardContent.getChildren().clear();
+
+        // Aggregate corrections across all sessions (each session can carry its own list)
+        List<JsonObject> allCorrs = new ArrayList<>();
+        if (root.has("sessions") && !root.get("sessions").isJsonNull()) {
+            for (var el : root.getAsJsonArray("sessions")) {
+                JsonObject s = el.getAsJsonObject();
+                if (!s.has("manual_detection_corrections")
+                        || s.get("manual_detection_corrections").isJsonNull()) continue;
+                for (var c : s.getAsJsonArray("manual_detection_corrections"))
+                    if (c.isJsonObject()) allCorrs.add(c.getAsJsonObject());
+            }
+        }
+
+        if (allCorrs.isEmpty()) {
+            setPlaceholder(detectionCorrectionsCardContent, "No manual detection correction recorded");
+            return;
+        }
+
+        long nDeletions = allCorrs.stream().filter(c -> "deletion".equals(str(c, "type", ""))).count();
+        long nSplits    = allCorrs.stream().filter(c -> "split".equals(str(c, "type",    ""))).count();
+
+        StringBuilder summary = new StringBuilder("Total : " + allCorrs.size() + " correction(s)");
+        if (nDeletions > 0) summary.append("  •  ").append(nDeletions).append(" suppression(s)");
+        if (nSplits    > 0) summary.append("  •  ").append(nSplits).append(" split(s)");
+        detectionCorrectionsCardContent.getChildren().add(
+            lbl(summary.toString(), TEXT_MAIN, 12, FontWeight.BOLD, false));
+        detectionCorrectionsCardContent.getChildren().add(sep());
+
+        GridPane grid = new GridPane();
+        grid.setHgap(16);
+        grid.setVgap(4);
+        grid.add(lbl("Type",       TEXT_MUTED, 10, FontWeight.BOLD, false), 0, 0);
+        grid.add(lbl("Détections", TEXT_MUTED, 10, FontWeight.BOLD, false), 1, 0);
+        grid.add(lbl("Par",        TEXT_MUTED, 10, FontWeight.BOLD, false), 2, 0);
+        grid.add(lbl("Quand",      TEXT_MUTED, 10, FontWeight.BOLD, false), 3, 0);
+        grid.add(lbl("Note",       TEXT_MUTED, 10, FontWeight.BOLD, false), 4, 0);
+
+        // Newest first
+        List<JsonObject> reversed = new ArrayList<>(allCorrs);
+        Collections.reverse(reversed);
+
+        int row = 1;
+        for (JsonObject corr : reversed) {
+            String type   = str(corr, "type",      "deletion");
+            String author = str(corr, "author",    "?");
+            String ts     = str(corr, "timestamp", "");
+            String note   = str(corr, "note",      null);
+            int    nDel   = corr.has("n_deleted") ? corr.get("n_deleted").getAsInt() : 0;
+            int    nCre   = corr.has("n_created") ? corr.get("n_created").getAsInt() : 0;
+
+            boolean isSplit    = "split".equals(type);
+            String  typeLabel  = isSplit ? "✂  Split"     : "🗑  Deletion";
+            String  typeColor  = isSplit ? PEACH           : RED;
+            String  detText    = isSplit ? nDel + " → " + nCre : String.valueOf(nDel);
+            String  tsShort    = ts.length() >= 10 ? ts.substring(0, 10) : ts;
+
+            Label typeLbl = lbl(typeLabel, typeColor, 11, FontWeight.BOLD, false);
+            Label detLbl  = lbl(detText,   TEXT_SUB,  11, FontWeight.NORMAL, false);
+            Label authLbl = lbl(truncate(author, 20), BLUE,      11, FontWeight.NORMAL, false);
+            Label tsLbl   = lbl(tsShort,   TEXT_MUTED, 11, FontWeight.NORMAL, false);
+            Label noteLbl;
+            if (note != null && !note.isBlank()) {
+                noteLbl = lbl("\"" + truncate(note, 44) + "\"", TEXT_MUTED, 11, FontWeight.NORMAL, true);
+                if (note.length() > 44) noteLbl.setTooltip(new Tooltip(note));
+            } else {
+                noteLbl = lbl("—", TEXT_MUTED, 11, FontWeight.NORMAL, true);
+            }
+
+            // Tooltip on type cell: list deleted UUIDs / classes
+            if (corr.has("deleted") && corr.get("deleted").isJsonArray()) {
+                StringBuilder tip = new StringBuilder();
+                for (var d : corr.getAsJsonArray("deleted")) {
+                    if (!d.isJsonObject()) continue;
+                    JsonObject det = d.getAsJsonObject();
+                    String cls = str(det, "class", "?");
+                    String uid = str(det, "uuid",  "");
+                    String uid8 = uid.length() >= 8 ? uid.substring(0, 8) + "…" : uid;
+                    if (tip.length() > 0) tip.append("\n");
+                    tip.append(cls).append("  ").append(uid8);
+                }
+                if (tip.length() > 0) typeLbl.setTooltip(new Tooltip(tip.toString()));
+            }
+
+            grid.add(typeLbl, 0, row);
+            grid.add(detLbl,  1, row);
+            grid.add(authLbl, 2, row);
+            grid.add(tsLbl,   3, row);
+            grid.add(noteLbl, 4, row);
+            row++;
+        }
+        detectionCorrectionsCardContent.getChildren().add(grid);
+    }
+
+
 
     private void buildAnnotationsCard(JsonObject root) {
         annotationsCardContent.getChildren().clear();
