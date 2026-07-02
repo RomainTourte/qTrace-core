@@ -53,7 +53,10 @@ public final class QTraceLicenseGate {
 
     private QTraceLicenseGate() {}
 
-    private static final String STATUS_URL = "https://qtrace.ca/api/license/status";
+    // www.qtrace.ca (not the apex) — qtrace.ca 308-redirects to www, and the HTTP
+    // client used here does not follow redirects, so the status check would silently
+    // always fail-soft as "offline" instead of ever seeing the real online status.
+    private static final String STATUS_URL = "https://www.qtrace.ca/api/license/status";
     private static final String PORTAL_URL = "https://qtrace.ca/portal";
 
     public static void checkAtStartup(QuPathGUI qupath, QTraceController controller) {
