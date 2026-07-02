@@ -62,10 +62,13 @@ public final class QTraceUpdater {
 
     private static final String GITHUB_LATEST =
         "https://api.github.com/repos/RomainTourte/qTrace-core/releases/latest";
+    // www.qtrace.ca (not the apex) — qtrace.ca 308-redirects to www, and a
+    // cross-host redirect makes java.net.http.HttpClient drop the Authorization
+    // header, breaking the licensed compliance download (HTTP 401).
     private static final String VERSION_URL =
-        "https://qtrace.ca/api/version";
+        "https://www.qtrace.ca/api/version";
     private static final String COMP_DOWNLOAD_URL =
-        "https://qtrace.ca/api/download/compliance/licensed";
+        "https://www.qtrace.ca/api/download/compliance/licensed";
 
     private static final Pattern JAR_VERSION =
         Pattern.compile("^qtrace-(?:core|compliance)-(\\d+(?:\\.\\d+)*)\\.jar$");
