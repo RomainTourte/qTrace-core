@@ -262,12 +262,19 @@ public final class QTraceUpdater {
         return Path.of(System.getProperty("user.home"), "QuPath", "v0.7", "extensions");
     }
 
-    /** Removes versioned JARs for {@code module} older than the highest present (best-effort). */
+    /**
+     * Removes versioned JARs for {@code module} older than the highest present, plus the
+     * legacy unversioned {@code qtrace-<module>.jar} (pre-dates the auto-updater's versioned
+     * filenames) whenever a versioned JAR exists — leaving both on the classpath means two
+     * definitions of the same plugin class, and QuPath's classloader can pick either one,
+     * silently reviving an old version even after a successful update (best-effort).
+     */
     public static void reapOldJars(Class<?> anchor, String module) {
         try {
             Path dir = extensionsDir(anchor);
             if (!Files.isDirectory(dir)) return;
             String prefix = "qtrace-" + module + "-";
+            String bareLegacyName = "qtrace-" + module + ".jar";
             String best = null;
             try (var s = Files.list(dir)) {
                 for (Path p : (Iterable<Path>) s::iterator) {
@@ -280,7 +287,8 @@ public final class QTraceUpdater {
             try (var s = Files.list(dir)) {
                 for (Path p : (Iterable<Path>) s::iterator) {
                     String v = versionOf(p, prefix);
-                    if (v != null && compareSemver(v, keep) < 0) {
+                    boolean isBareLegacy = p.getFileName().toString().equals(bareLegacyName);
+                    if (isBareLegacy || (v != null && compareSemver(v, keep) < 0)) {
                         try { Files.deleteIfExists(p); } catch (Exception ignored) {}
                     }
                 }
