@@ -60,7 +60,7 @@ import java.util.function.Consumer;
  */
 public class QTraceController {
 
-    static final String VERSION = "1.0.8";
+    static final String VERSION = "1.0.9";
 
     public static String getDisplayVersion() {
         QTracePlugin ep = QTracePluginManager.get();
