@@ -60,7 +60,16 @@ import java.util.function.Consumer;
  */
 public class QTraceController {
 
-    static final String VERSION = "1.0.10";
+    // Read from the JAR manifest (Implementation-Version, set to the Gradle `version` at
+    // build time) instead of a hardcoded literal — see the identical fix + rationale on
+    // QTraceCompliancePlugin.COMPLIANCE_VERSION: a literal here silently goes stale on every
+    // release bump, breaking the auto-updater's version comparison.
+    static final String VERSION = resolveVersion();
+
+    private static String resolveVersion() {
+        String v = QTraceController.class.getPackage().getImplementationVersion();
+        return v != null ? v : "dev";
+    }
 
     public static String getDisplayVersion() {
         QTracePlugin ep = QTracePluginManager.get();
