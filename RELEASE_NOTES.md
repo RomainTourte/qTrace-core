@@ -1,28 +1,18 @@
-## What's new in v1.0.9
+## What's new in v1.0.10
 
-### Dashboard Card 7 — Detection corrections
-New Dashboard card surfacing the manual detection corrections captured by the 1.0.8 audit feature — deleted/split detections per image, with the justification note and timestamp shown inline.
-
-### Fix — updater endpoints dropped the license on redirect
-`qtrace.ca` 308-redirects to `www.qtrace.ca`. `HttpClient` drops the `Authorization` header on a cross-host redirect, which made the licensed Compliance JAR download fail with HTTP 401 even with a valid license — and the license status check (`QTraceLicenseGate`) silently reported "offline" instead of following the redirect. Both now call `www.qtrace.ca` directly.
-
-### Fix — old JAR left on the classpath after an update
-`reapOldJars` never removed the legacy unversioned `qtrace-<module>.jar` (from before the auto-updater's versioned naming). Left in place, it gave QuPath two definitions of the same plugin class to choose from, so an update could silently appear to have no effect. It is now cleaned up whenever a versioned JAR is present.
+### Fix — auto-update could get stuck re-offering the same version
+The JAR superseded by an update (e.g. the bare legacy `qtrace-compliance.jar`) was only cleaned up by `reapOldJars` on the *next* startup, so right after clicking "Install" and restarting, both the old and new JAR were still present at once. QuPath's classloader only ever resolves one `Class` object per fully-qualified name, so the "pick the plugin reporting the highest version" logic couldn't out-vote whichever JAR the classloader happened to load first — the update could silently never take effect, with the identical update dialog reappearing on every subsequent restart. The superseded file is now removed immediately after the new one is written, so a single restart is enough.
 
 ---
 
-### Added
-- **Dashboard Card 7** — manual detection corrections (deletions/splits) shown per image, with note and timestamp
-
 ### Fixed
-- **Auto-updater / license check redirects** — `QTraceUpdater` and `QTraceLicenseGate` now call `www.qtrace.ca` directly instead of `qtrace.ca`, avoiding the `Authorization`-header-dropping cross-host redirect
-- **`reapOldJars` legacy cleanup** — unversioned `qtrace-<module>.jar` is now removed alongside superseded versioned JARs
+- **Auto-update stuck loop** — the superseded JAR for a module is now reaped immediately after install instead of waiting for the following startup, so the swap reliably takes effect after one restart
 
 ---
 
 ## Installation
 
-Drop `qtrace-core-1.0.9.jar` into your QuPath extensions folder:
+Drop `qtrace-core-1.0.10.jar` into your QuPath extensions folder:
 
 | Platform | Path |
 |---|---|
