@@ -229,6 +229,18 @@ public final class QTraceUpdater {
             Files.write(tmp, data);
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
 
+            // Remove the superseded file(s) for this module NOW rather than waiting for the
+            // next startup's reapOldJars() call. Two same-named-class JARs (e.g. the bare
+            // legacy qtrace-compliance.jar plus this new versioned one) sitting on the
+            // extensions dir at the NEXT boot let QuPath's classloader silently keep
+            // resolving whichever one it finds first — our "pick the highest getPluginVersion()"
+            // logic in QTraceExtension can't out-vote that, because a classloader only ever
+            // defines one Class object per fully-qualified name, so only one of the two JARs'
+            // classes is ever actually visible, regardless of which ServiceLoader entry we
+            // pick. Reaping right away means only the new file exists at the next restart, so
+            // there is nothing left to be ambiguous about — one restart is enough.
+            QTraceUpdater.reapOldJars(QTraceUpdater.class, module);
+
             info(qupath, QTraceI18n.t("update.installed").replace("{0}", remoteVer));
         } catch (Exception e) {
             error(qupath, QTraceI18n.t("update.failed").replace("{0}", e.getMessage()));
