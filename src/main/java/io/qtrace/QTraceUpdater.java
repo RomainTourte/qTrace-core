@@ -240,7 +240,7 @@ public final class QTraceUpdater {
             // there is nothing left to be ambiguous about — one restart is enough.
             QTraceUpdater.reapOldJars(QTraceUpdater.class, module);
 
-            info(qupath, QTraceI18n.t("update.installed").replace("{0}", remoteVer));
+            promptRestart(qupath, remoteVer);
         } catch (Exception e) {
             error(qupath, QTraceI18n.t("update.failed").replace("{0}", e.getMessage()));
         }
@@ -353,6 +353,28 @@ public final class QTraceUpdater {
 
     private static void info(QuPathGUI qupath, String msg)  { alert(qupath, Alert.AlertType.INFORMATION, msg); }
     private static void error(QuPathGUI qupath, String msg) { alert(qupath, Alert.AlertType.ERROR, msg); }
+
+    /** Post-install prompt: offer to quit QuPath now (same as the window's close button) or later. */
+    private static void promptRestart(QuPathGUI qupath, String remoteVer) {
+        Platform.runLater(() -> {
+            Alert a = new Alert(Alert.AlertType.INFORMATION);
+            a.setTitle(QTraceI18n.t("update.title"));
+            a.setHeaderText(null);
+            a.setContentText(QTraceI18n.t("update.installed").replace("{0}", remoteVer)
+                + "\n" + QTraceI18n.t("update.installed.hint"));
+            if (qupath != null && qupath.getStage() != null) a.initOwner(qupath.getStage());
+
+            ButtonType restartNow = new ButtonType(QTraceI18n.t("update.restart.now"), ButtonBar.ButtonData.OK_DONE);
+            ButtonType later       = new ButtonType(QTraceI18n.t("update.later"),       ButtonBar.ButtonData.CANCEL_CLOSE);
+            a.getButtonTypes().setAll(restartNow, later);
+
+            Optional<ButtonType> result = a.showAndWait();
+            if (result.isPresent() && result.get() == restartNow && qupath != null && qupath.getStage() != null) {
+                qupath.getStage().fireEvent(
+                    new javafx.stage.WindowEvent(qupath.getStage(), javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST));
+            }
+        });
+    }
 
     private static void alert(QuPathGUI qupath, Alert.AlertType type, String msg) {
         Platform.runLater(() -> {
