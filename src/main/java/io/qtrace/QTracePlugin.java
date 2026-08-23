@@ -120,4 +120,14 @@ public interface QTracePlugin {
     default CompletableFuture<byte[]> exportReportPdf(String markdown) {
         return CompletableFuture.completedFuture(null);
     }
+
+    /**
+     * Fetches the validator's Digital Identity snapshot (ED25519 key, Polygon anchor
+     * status, public badge state) from the qtrace.ca portal. Auth: reads the .qtlicense
+     * JWT from QTraceConfig and sends it as a bearer token. Returns a CompletableFuture
+     * resolving to null on failure / not supported / no license.
+     */
+    default CompletableFuture<IdentityInfo> fetchIdentity() {
+        return CompletableFuture.completedFuture(null);
+    }
 }

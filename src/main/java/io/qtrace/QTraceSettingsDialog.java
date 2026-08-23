@@ -21,6 +21,7 @@ package io.qtrace;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -33,9 +34,7 @@ import javafx.util.StringConverter;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
-import java.awt.Desktop;
 import java.io.File;
-import java.net.URI;
 
 /**
  * Modal dialog for configuring QTrace export paths.
@@ -208,12 +207,7 @@ public class QTraceSettingsDialog {
         });
 
         Button btnGetLicense = flatButton("🔗 Get license", BLUE);
-        btnGetLicense.setOnAction(e -> {
-            new Thread(() -> {
-                try { Desktop.getDesktop().browse(new URI(PORTAL_URL)); }
-                catch (Exception ignored) {}
-            }, "qtrace-browser").start();
-        });
+        btnGetLicense.setOnAction(e -> openUrl(PORTAL_URL));
 
         GridPane licenseGrid = new GridPane();
         licenseGrid.setHgap(8);
@@ -240,25 +234,31 @@ public class QTraceSettingsDialog {
         licenseGrid.add(btnGetLicense,   3, 0);
         licenseGrid.add(licenseStatusLbl, 1, 1, 3, 1);
 
-        Separator sep2 = new Separator();
-        sep2.setStyle("-fx-background-color: " + BORDER + ";");
+        // ── Detection correction prompting ──────────────────────────────────────
+        CheckBox chkDetectionNote = new CheckBox(
+            "Prompt for a note when detections or annotations are manually deleted (or detections split)");
+        chkDetectionNote.setSelected(cfg.isPromptDetectionNote());
+        chkDetectionNote.setTextFill(Color.web(TEXT_SUB));
+        chkDetectionNote.setWrapText(true);
+        chkDetectionNote.setTooltip(hintTooltip(
+            "When disabled, corrections are logged silently with no note prompt. "
+          + "Either way, every deletion/split is recorded in the .qtrace sidecar."));
 
-        Separator sep  = new Separator();
-        sep.setStyle("-fx-background-color: " + BORDER + ";");
+        CheckBox chkUnstampedReminder = new CheckBox(
+            "Prompt for a note if modifications not stamped has been detected when you are closing an image");
+        chkUnstampedReminder.setSelected(cfg.isPromptUnstampedReminder());
+        chkUnstampedReminder.setTextFill(Color.web(TEXT_SUB));
+        chkUnstampedReminder.setWrapText(true);
+        chkUnstampedReminder.setTooltip(hintTooltip(
+            "When disabled, closing or switching away from an image with unstamped modifications "
+          + "happens silently — no prompt, and the stamp is potentially lost."));
 
-        // ── Security (activity report) ──────────────────────────────────────────
-        Separator sep3 = new Separator();
-        sep3.setStyle("-fx-background-color: " + BORDER + ";");
-
+        // ── Security (activity report) — folded into Preferences ────────────────
         CheckBox chkReportConfirm = new CheckBox(QTraceI18n.t("settings.security.confirm"));
         chkReportConfirm.setSelected(cfg.isReportConfirmBeforeSend());
         chkReportConfirm.setTextFill(Color.web(TEXT_SUB));
         chkReportConfirm.setWrapText(true);
-
-        Label securityHint = new Label(QTraceI18n.t("settings.security.confirm.hint"));
-        securityHint.setTextFill(Color.web(TEXT_MUTED));
-        securityHint.setFont(Font.font("System", 11));
-        securityHint.setWrapText(true);
+        chkReportConfirm.setTooltip(hintTooltip(QTraceI18n.t("settings.security.confirm.hint")));
 
         CheckBox chkPseudonymize = new CheckBox(QTraceI18n.t("settings.security.pseudonymize"));
         chkPseudonymize.setDisable(true);   // shown now, implemented later
@@ -282,42 +282,11 @@ public class QTraceSettingsDialog {
         HBox langRow = new HBox(8, langLabel, langBox);
         langRow.setAlignment(Pos.CENTER_LEFT);
 
-        VBox securityBox = new VBox(6, chkReportConfirm, securityHint, langRow, pseudoRow);
-        securityBox.setPadding(new Insets(4, 20, 8, 20));
-
-        // ── Detection correction prompting ──────────────────────────────────────
-        Separator sep4 = new Separator();
-        sep4.setStyle("-fx-background-color: " + BORDER + ";");
-
-        CheckBox chkDetectionNote = new CheckBox(
-            "Prompt for a note when detections or annotations are manually deleted (or detections split)");
-        chkDetectionNote.setSelected(cfg.isPromptDetectionNote());
-        chkDetectionNote.setTextFill(Color.web(TEXT_SUB));
-        chkDetectionNote.setWrapText(true);
-
-        Label detectionNoteHint = new Label(
-            "When disabled, corrections are logged silently with no note prompt. "
-          + "Either way, every deletion/split is recorded in the .qtrace sidecar.");
-        detectionNoteHint.setTextFill(Color.web(TEXT_MUTED));
-        detectionNoteHint.setFont(Font.font("System", 11));
-        detectionNoteHint.setWrapText(true);
-        detectionNoteHint.setMaxWidth(440);
-
-        CheckBox chkUnstampedReminder = new CheckBox(
-            "Prompt for a note if modifications not stamped has been detected when you are closing an image");
-        chkUnstampedReminder.setSelected(cfg.isPromptUnstampedReminder());
-        chkUnstampedReminder.setTextFill(Color.web(TEXT_SUB));
-        chkUnstampedReminder.setWrapText(true);
-
-        Label unstampedReminderHint = new Label(
-            "When disabled, closing or switching away from an image with unstamped modifications "
-          + "happens silently — no prompt, and the stamp is potentially lost.");
-        unstampedReminderHint.setTextFill(Color.web(TEXT_MUTED));
-        unstampedReminderHint.setFont(Font.font("System", 11));
-        unstampedReminderHint.setWrapText(true);
-        unstampedReminderHint.setMaxWidth(440);
-
-        VBox captureBox = new VBox(6, chkDetectionNote, detectionNoteHint, chkUnstampedReminder, unstampedReminderHint);
+        VBox captureBox = new VBox(10,
+            subTitle("General"),
+            chkDetectionNote, chkUnstampedReminder,
+            subTitle("Security"),
+            chkReportConfirm, langRow, pseudoRow);
         captureBox.setPadding(new Insets(4, 20, 8, 20));
 
         // ── Buttons ────────────────────────────────────────────────────────────
@@ -359,27 +328,93 @@ public class QTraceSettingsDialog {
         HBox buttonRow = new HBox(8, btnReset, spacer(), btnCancel, btnOk);
         buttonRow.setAlignment(Pos.CENTER_RIGHT);
         buttonRow.setPadding(new Insets(8, 20, 16, 20));
+        buttonRow.setStyle("-fx-background-color: " + BG_BASE + ";");
+
+        // ── Pages ──────────────────────────────────────────────────────────────
+        VBox.setMargin(hint, new Insets(0, 20, 8, 20));
+
+        VBox pageIdentity = new VBox(14, validatorGrid, buildDigitalIdentityCard(cfg), buildCredentialsRow());
+        VBox pageLicense    = new VBox(licenseGrid);
+        VBox pagePaths      = new VBox(grid, hint, projectFolderBox);
+        VBox pagePreferences = captureBox;
+
+        Label appearanceSoon = new Label("Theme customization — coming soon.");
+        appearanceSoon.setTextFill(Color.web(TEXT_MUTED));
+        appearanceSoon.setFont(Font.font("System", 11));
+        VBox pageAppearance = new VBox(appearanceSoon);
+        pageAppearance.setPadding(new Insets(4, 20, 8, 20));
+
+        // ── Content area: title bar + scrollable page ────────────────────────────
+        Label headerLbl = new Label();
+        headerLbl.setTextFill(Color.web(TEXT_MAIN));
+        headerLbl.setFont(Font.font("System", FontWeight.BOLD, 13));
+        headerLbl.setPadding(new Insets(12, 20, 12, 20));
+        headerLbl.setMaxWidth(Double.MAX_VALUE);
+        headerLbl.setStyle("-fx-background-color: " + BG_SURFACE + ";"
+            + "-fx-border-color: transparent transparent " + BORDER + " transparent;"
+            + "-fx-border-width: 0 0 1 0;");
+
+        ScrollPane scrollPane = new ScrollPane();
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setStyle("-fx-background: " + BG_BASE + "; -fx-background-color: transparent;");
+
+        VBox centerBox = new VBox(headerLbl, scrollPane);
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+        centerBox.setStyle("-fx-background-color: " + BG_BASE + ";");
+
+        // ── Sidebar ────────────────────────────────────────────────────────────
+        record NavEntry(String title, Node page, Label navLabel) {}
+        java.util.List<NavEntry> entries = new java.util.ArrayList<>();
+        VBox sidebar = new VBox();
+        sidebar.setPrefWidth(190);
+        sidebar.setMinWidth(190);
+        sidebar.setStyle("-fx-background-color: " + BG_SURFACE + ";");
+
+        VBox pageAbout = QTraceAboutDialog.buildContent();
+
+        Object[][] sections = {
+            {"Identity",       pageIdentity},
+            {"Licence",        pageLicense},
+            {"Paths",          pagePaths},
+            {"Preferences",    pagePreferences},
+            {"Appearance",     pageAppearance},
+            {"About qTrace",   pageAbout},
+        };
+
+        for (Object[] s : sections) {
+            String title = (String) s[0];
+            Node page = (Node) s[1];
+            Label navLabel = new Label(title);
+            navLabel.setMaxWidth(Double.MAX_VALUE);
+            navLabel.setFont(Font.font("System", 12));
+            navLabel.setPadding(new Insets(10, 16, 10, 16));
+            navLabel.setStyle("-fx-cursor: hand;");
+            entries.add(new NavEntry(title, page, navLabel));
+            sidebar.getChildren().add(navLabel);
+        }
+
+        java.util.function.Consumer<NavEntry> selectEntry = entry -> {
+            headerLbl.setText(entry.title());
+            scrollPane.setContent(entry.page());
+            for (NavEntry other : entries) {
+                boolean selected = other == entry;
+                other.navLabel().setTextFill(Color.web(selected ? TEXT_MAIN : TEXT_SUB));
+                other.navLabel().setStyle("-fx-cursor: hand; -fx-background-color: "
+                    + (selected ? "#242438" : "transparent") + ";");
+            }
+        };
+        for (NavEntry entry : entries) entry.navLabel().setOnMouseClicked(e -> selectEntry.accept(entry));
+        selectEntry.accept(entries.get(0));
 
         // ── Root ───────────────────────────────────────────────────────────────
-        VBox root = new VBox(0,
-            sectionTitle("Export Path Configuration"),
-            grid, hint, projectFolderBox,
-            sep,
-            sectionTitle("Validator"),
-            validatorGrid,
-            sep2,
-            sectionTitle("Compliance License"),
-            licenseGrid,
-            sep3,
-            sectionTitle(QTraceI18n.t("settings.security.tab")),
-            securityBox,
-            sep4,
-            sectionTitle("Capture"),
-            captureBox,
-            buttonRow);
-        VBox.setMargin(hint, new Insets(0, 20, 8, 20));
+        BorderPane root = new BorderPane();
+        root.setLeft(sidebar);
+        root.setCenter(centerBox);
+        root.setBottom(buttonRow);
         root.setStyle("-fx-background-color: " + BG_BASE + ";");
-        root.setPrefWidth(520);
+        root.setPrefSize(780, 500);
 
         dlg.setScene(new Scene(root));
         dlg.showAndWait();
@@ -428,14 +463,6 @@ public class QTraceSettingsDialog {
         return tf;
     }
 
-    private static Label sectionTitle(String text) {
-        Label lbl = new Label(text);
-        lbl.setTextFill(Color.web(TEXT_MAIN));
-        lbl.setFont(Font.font("System", FontWeight.BOLD, 13));
-        lbl.setPadding(new Insets(14, 20, 4, 20));
-        return lbl;
-    }
-
     private static Button flatButton(String text, String color) {
         Button btn = new Button(text);
         btn.setTextFill(Color.web(color));
@@ -465,6 +492,145 @@ public class QTraceSettingsDialog {
         Region r = new Region();
         HBox.setHgrow(r, Priority.ALWAYS);
         return r;
+    }
+
+    // ── Digital Identity (Compliance) ────────────────────────────────────────
+
+    private static VBox buildDigitalIdentityCard(QTraceConfig cfg) {
+        Label status = new Label("Loading digital identity…");
+        status.setTextFill(Color.web(TEXT_MUTED));
+        status.setFont(Font.font("System", 11));
+        status.setWrapText(true);
+
+        VBox card = new VBox(8, status);
+        card.setPadding(new Insets(12, 14, 12, 14));
+        card.setStyle(
+            "-fx-background-color: " + BG_SURFACE + ";"
+          + "-fx-border-color: " + BORDER + ";"
+          + "-fx-border-radius: 8;"
+          + "-fx-background-radius: 8;"
+        );
+
+        VBox section = new VBox(6, subTitle("Digital Identity"), card);
+        section.setPadding(new Insets(4, 20, 4, 20));
+
+        QTracePlugin plugin = QTracePluginManager.get();
+        if (plugin == null) {
+            status.setText("Available with a qTrace Compliance license.");
+            return section;
+        }
+        if (cfg.getLicensePath().isBlank()) {
+            status.setText("No license loaded — set your .qtlicense file in the Licence section.");
+            return section;
+        }
+
+        plugin.fetchIdentity().thenAccept(info -> javafx.application.Platform.runLater(() -> {
+            card.getChildren().clear();
+            if (info == null) {
+                status.setText("Could not fetch digital identity — check your license and network connection.");
+                card.getChildren().add(status);
+                return;
+            }
+
+            GridPane g = new GridPane();
+            g.setHgap(10);
+            g.setVgap(6);
+            int row = 0;
+
+            g.add(idFieldLabel("Key"), 0, row);
+            g.add(monoValue(info.signingKeyPubShort()), 1, row++);
+
+            if (info.anchored()) {
+                g.add(idFieldLabel("Anchor tx"), 0, row);
+                Label txLbl = monoValue(info.anchorTxHashShort());
+                if (info.explorerUrl() != null) {
+                    txLbl.setTextFill(Color.web(BLUE));
+                    txLbl.setStyle(txLbl.getStyle() + "-fx-cursor: hand; -fx-underline: true;");
+                    txLbl.setOnMouseClicked(e -> openUrl(info.explorerUrl()));
+                }
+                g.add(txLbl, 1, row++);
+
+                g.add(idFieldLabel("Anchored"), 0, row);
+                g.add(monoValue(info.anchorAt() != null && info.anchorAt().length() >= 10
+                    ? info.anchorAt().substring(0, 10) : "—"), 1, row++);
+            } else {
+                g.add(idFieldLabel("Anchor"), 0, row);
+                g.add(monoValue("Pending — anchoring on Polygon can take a few minutes after issuance."), 1, row++);
+            }
+
+            Label badgeState = new Label(info.identityPublic()
+                ? "✓ Public badge enabled" + (info.badgeUrl() != null ? "  —  " + info.badgeUrl() : "")
+                : "Public badge disabled — enable it on qtrace.ca to share your on-chain identity.");
+            badgeState.setTextFill(Color.web(info.identityPublic() ? GREEN : TEXT_MUTED));
+            badgeState.setFont(Font.font("System", 11));
+            badgeState.setWrapText(true);
+            badgeState.setMaxWidth(440);
+
+            card.getChildren().addAll(g, badgeState);
+        }));
+
+        return section;
+    }
+
+    private static Label idFieldLabel(String text) {
+        Label l = new Label(text);
+        l.setTextFill(Color.web(TEXT_MUTED));
+        l.setFont(Font.font("System", 11));
+        return l;
+    }
+
+    private static Label monoValue(String text) {
+        Label l = new Label(text);
+        l.setTextFill(Color.web(TEXT_MAIN));
+        l.setFont(Font.font("Monospaced", 11));
+        l.setWrapText(true);
+        l.setMaxWidth(380);
+        return l;
+    }
+
+    private static HBox buildCredentialsRow() {
+        Label lbl = new Label("Professional registry, diplomas and ORCID are managed on the portal.");
+        lbl.setTextFill(Color.web(TEXT_MUTED));
+        lbl.setFont(Font.font("System", 11));
+        lbl.setWrapText(true);
+
+        Button btn = flatButton("🎓 Manage my credentials →", BLUE);
+        btn.setOnAction(e -> openUrl(PORTAL_URL));
+
+        HBox row = new HBox(12, lbl, btn);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(4, 20, 8, 20));
+        return row;
+    }
+
+    private static void openUrl(String url) {
+        new Thread(() -> {
+            try {
+                String os = System.getProperty("os.name", "").toLowerCase();
+                ProcessBuilder pb;
+                if (os.contains("linux"))    pb = new ProcessBuilder("xdg-open", url);
+                else if (os.contains("mac")) pb = new ProcessBuilder("open", url);
+                else                         pb = new ProcessBuilder("cmd", "/c", "start", url);
+                pb.start();
+            } catch (Exception ignored) {}
+        }, "qtrace-browser").start();
+    }
+
+    private static Label subTitle(String text) {
+        Label lbl = new Label(text.toUpperCase());
+        lbl.setTextFill(Color.web(TEXT_MUTED));
+        lbl.setFont(Font.font("System", FontWeight.BOLD, 10));
+        lbl.setStyle("-fx-letter-spacing: 0.6;");
+        VBox.setMargin(lbl, new Insets(6, 0, -2, 0));
+        return lbl;
+    }
+
+    private static Tooltip hintTooltip(String text) {
+        Tooltip tip = new Tooltip(text);
+        tip.setWrapText(true);
+        tip.setMaxWidth(360);
+        tip.setShowDelay(javafx.util.Duration.millis(200));
+        return tip;
     }
 
     private static void showError(Stage owner, String msg) {

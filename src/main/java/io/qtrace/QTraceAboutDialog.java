@@ -57,7 +57,12 @@ public class QTraceAboutDialog {
 
     enum Mode { CORE, COMPLIANCE, CERTIFIED }
 
-    public static void show(QuPathGUI qupath) {
+    /**
+     * Builds the same hero/cert-card/feature-grid/footer content shown in the standalone
+     * About dialog, without the floating-window chrome — for embedding elsewhere (e.g. a
+     * Settings section).
+     */
+    public static VBox buildContent() {
         boolean hasCompliance = QTracePluginManager.hasCompliance();
         LicenseInfo activeLicense = null;
         if (hasCompliance) {
@@ -73,6 +78,19 @@ public class QTraceAboutDialog {
             && !QTracePluginManager.isEntitled()
             && !QTraceConfig.get().getLicensePath().isBlank();
 
+        Image logo = QTracePanel.loadLogo();
+
+        VBox content = new VBox();
+        content.getChildren().add(buildHero(logo, mode, inactive));
+        if (mode == Mode.CERTIFIED) content.getChildren().add(buildCertCard(activeLicense));
+        content.getChildren().add(hRule());
+        content.getChildren().add(buildFeatureGrid(mode));
+        content.getChildren().add(hRule());
+        content.getChildren().add(buildFooter(mode, inactive));
+        return content;
+    }
+
+    public static void show(QuPathGUI qupath) {
         Stage dialog = new Stage();
         dialog.initOwner(qupath.getStage());
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -99,12 +117,7 @@ public class QTraceAboutDialog {
         });
 
         root.getChildren().add(buildTitleBar(dialog));
-        root.getChildren().add(buildHero(logo, mode, inactive));
-        if (mode == Mode.CERTIFIED) root.getChildren().add(buildCertCard(activeLicense));
-        root.getChildren().add(hRule());
-        root.getChildren().add(buildFeatureGrid(mode));
-        root.getChildren().add(hRule());
-        root.getChildren().add(buildFooter(mode, inactive));
+        root.getChildren().addAll(buildContent().getChildren());
 
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
