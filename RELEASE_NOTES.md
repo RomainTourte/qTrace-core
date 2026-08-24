@@ -1,3 +1,19 @@
+## What's new in v1.1.4
+
+### Changed — Settings redesigned as a two-pane sidebar
+Settings now uses a Thunderbird-style layout: a left-hand menu (Identity, Licence, Paths, Preferences, Appearance, About qTrace) next to a scrollable content pane, in a wider/shorter window. Security's two settings moved into Preferences under a "SECURITY" sub-heading rather than sitting in their own tab, and their hint text is now a tooltip on hover instead of a permanently-visible line. About qTrace is now reachable from inside Settings, reusing the same content as the standalone About dialog.
+
+### Added — Digital Identity card (Compliance)
+The Identity page now shows a read-only Digital Identity card for validators with a Compliance license: the ED25519 signing key, the Polygon anchor transaction (linked to the block explorer) and date, and the public badge status. A "Manage my credentials →" link opens the portal for professional registry / diploma / ORCID management, which stays a portal-only feature.
+
+### Changed — Post-update dialog offers to restart now
+After an auto-update finishes installing, the dialog now offers **Restart Now** / **Later** instead of just an OK — restarting immediately closes QuPath so the new JAR takes over on the next launch.
+
+### Fixed — Cloud Workspace push failure showed a raw "ERROR:" prefix
+A push failure (e.g. missing/unreadable license) was logged to the panel with the internal "ERROR:" marker still attached instead of a clean message.
+
+---
+
 ## What's new in v1.1.3
 
 ### Added — Dashboard: Export to CSV
