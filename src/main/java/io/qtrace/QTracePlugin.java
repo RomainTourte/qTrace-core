@@ -41,14 +41,16 @@ public interface QTracePlugin {
     default void verifyContributor(String contributorId, QuPathGUI qupath) {}
     default void replay(QuPathGUI qupath, ActionLogger logger) {}
 
-    /**
-     * Validates a .qtlicense JWT token.
-     * Returns a decoded {@link LicenseInfo} if the signature is valid and the token is not expired,
-     * or null if the token is invalid.
-     */
     /** Returns the Compliance plugin version string, e.g. "1.0.2". */
     default String getPluginVersion() { return null; }
 
+    /**
+     * Verifies the RS256 signature of a .qtlicense JWT and decodes it.
+     * Returns the decoded {@link LicenseInfo}, or null if the token is malformed
+     * or its signature is invalid. Expiry is NOT checked here — callers must test
+     * {@link LicenseInfo#expired()} themselves (as {@code QTraceLicenseGate} does)
+     * so an expired license can be reported distinctly from a corrupted one.
+     */
     default LicenseInfo validateLicense(String token) { return null; }
 
     /**

@@ -58,7 +58,6 @@ public class QTraceConfig {
     private Boolean useProjectFolder; // when true, store everything under <project>/qTrace/ instead of the paths above
     private String validatorName;
     private String licensePath;
-    private String pinHash;       // SHA-256 hex of the user's PIN, null = no PIN set
     private String signingKeyPath; // path to qtrace-signing.key; null = default ~/.qTrace/qtrace-signing.key
 
     // Auto-update (null updateCheckEnabled = enabled by default)
@@ -132,12 +131,6 @@ public class QTraceConfig {
 
     public String getLicensePath()         { return licensePath != null ? licensePath : ""; }
     public void   setLicensePath(String p) { this.licensePath = blank(p); }
-
-    // ── PIN protection ────────────────────────────────────────────────────────
-
-    public boolean hasPinSet()          { return pinHash != null && !pinHash.isBlank(); }
-    public String  getPinHash()         { return pinHash != null ? pinHash : ""; }
-    public void    setPinHash(String h) { this.pinHash = (h == null || h.isBlank()) ? null : h; }
 
     // ── Signing key ───────────────────────────────────────────────────────────
 
