@@ -725,7 +725,10 @@ public class QTraceDashboard {
     }
 
     private String getSortKey(RowData rd, int colIdx) {
-        return switch (colIdx) {
+        // Never return null — colIdx 0/default fall back to rd.imageName(), which can itself
+        // be null (and parseSample()'s catch-all re-returns it as-is), crashing applySort()'s
+        // compareToIgnoreCase() with an NPE.
+        String key = switch (colIdx) {
             case 0  -> parseSample(rd.imageName());
             case 1  -> parseRoi(rd.imageName());
             case 2  -> {
@@ -749,6 +752,7 @@ public class QTraceDashboard {
             }
             default -> rd.imageName();
         };
+        return key != null ? key : "";
     }
 
     private void renderRows() {
