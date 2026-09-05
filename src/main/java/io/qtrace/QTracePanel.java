@@ -105,8 +105,10 @@ public class QTracePanel {
         stage.setMinHeight(340);
         stage.setHeight(460);
         if (QTracePluginManager.isEntitled()) {
-            stage.setMinWidth(560);
-            stage.setWidth(560);
+            // Compliance toolbar carries 9 buttons (Stamp + Upload/Replay/Versions/Report +
+            // Dashboard/Import/Export/Reset) — 560 truncated every caption to "St…"/"Up…".
+            stage.setMinWidth(760);
+            stage.setWidth(760);
         } else {
             // Core toolbar now carries Dashboard + Import + Reset — widened from 340/360 so
             // the extra icon button doesn't get squeezed or wrap onto a second line.
@@ -856,8 +858,8 @@ public class QTracePanel {
         Platform.runLater(() -> {
             stage.setTitle(QTraceController.getEditionLabel());
             if (QTracePluginManager.isEntitled()) {
-                stage.setMinWidth(560);
-                if (stage.getWidth() < 560) stage.setWidth(560);
+                stage.setMinWidth(760);
+                if (stage.getWidth() < 760) stage.setWidth(760);
             } else {
                 stage.setMinWidth(380);
                 if (stage.getWidth() < 380) stage.setWidth(400);
