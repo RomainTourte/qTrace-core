@@ -167,6 +167,7 @@ public class QTracePanel {
         HBox captureStatus = buildCaptureStatus();
 
         Button settingsBtn = iconOnlyButton(glyphIcon("⚙"), QTraceI18n.t("btn.settings.tooltip"), Color.web(GROUP_ADMIN));
+        settingsBtn.setId("settings-button"); // looked up by the screenshot harness — see ScreenshotHarness
         settingsBtn.setOnAction(e -> QTraceSettingsDialog.show(stage));
 
         topLine.getChildren().addAll(logoView, title, topSpacer, captureStatus, settingsBtn);
@@ -241,6 +242,7 @@ public class QTracePanel {
 
         HBox badge = new HBox(4, icon, label);
         badge.setAlignment(Pos.CENTER_LEFT);
+        badge.setId("license-badge"); // looked up by the screenshot harness — see ScreenshotHarness
         return badge;
     }
 
@@ -253,6 +255,7 @@ public class QTracePanel {
 
         // ⚡ Stamp — CTA. Validates & stamps the current trace (capture itself is passive).
         btnRecord = new Button(QTraceI18n.t("btn.stamp.caption"));
+        btnRecord.setId("stamp-button"); // looked up by the screenshot harness — see ScreenshotHarness
         btnRecord.setGraphic(scaledIcon(iconStamp(Color.web(CTA_TEAL)), 17));
         btnRecord.setContentDisplay(ContentDisplay.LEFT);
         btnRecord.setGraphicTextGap(7);
@@ -282,12 +285,14 @@ public class QTracePanel {
 
             btnPush = iconButton(iconFactory(this::iconUpload), QTraceI18n.t("btn.upload.caption"),
                 QTraceI18n.t("btn.upload.tooltip"), Color.web(GROUP_WORKSPACE));
+            btnPush.setId("upload-button"); // looked up by the screenshot harness — see ScreenshotHarness
             btnPush.setDisable(true);
             btnPush.setOpacity(0.45);
             btnPush.setOnAction(e -> controller.pushToWorkspace());
 
             Button btnReplay = iconButton(iconFactory(this::iconReplay), QTraceI18n.t("btn.replay.caption"),
                 QTraceI18n.t("btn.replay.tooltip"), Color.web(GROUP_WORKSPACE));
+            btnReplay.setId("replay-button"); // looked up by the screenshot harness — see ScreenshotHarness
             btnReplay.setOnAction(e -> controller.openReplayDialog());
 
             row.getChildren().addAll(btnPush, btnReplay);
@@ -295,10 +300,12 @@ public class QTracePanel {
 
             Button btnGraph = iconButton(iconFactory(this::iconVersions), QTraceI18n.t("btn.versions.caption"),
                 QTraceI18n.t("btn.versions.tooltip"), Color.web(GROUP_WORKSPACE));
+            btnGraph.setId("versions-button"); // looked up by the screenshot harness — see ScreenshotHarness
             btnGraph.setOnAction(e -> controller.showCommitGraph());
 
             Button btnReport = iconButton(iconFactory(this::iconReport), QTraceI18n.t("btn.report.caption"),
                 QTraceI18n.t("btn.report.tooltip"), Color.web(GROUP_WORKSPACE));
+            btnReport.setId("report-button"); // looked up by the screenshot harness — see ScreenshotHarness
             btnReport.setOnAction(e -> controller.generateActivityReport());
 
             row.getChildren().addAll(btnGraph, btnReport);
@@ -314,6 +321,11 @@ public class QTracePanel {
             QTraceI18n.t("btn.export.tooltip"), Color.web(GROUP_TOOLS));
         Button resetBtn = iconButton(iconFactory(this::iconReset), QTraceI18n.t("btn.reset.caption"),
             QTraceI18n.t("btn.reset.tooltip"), Color.web(RED));
+        // looked up by the screenshot harness — see ScreenshotHarness
+        dashboardBtn.setId("dashboard-button");
+        importBtn.setId("import-button");
+        exportBtn.setId("export-button");
+        resetBtn.setId("reset-button");
         dashboardBtn.setOnAction(e -> controller.showDashboard());
         importBtn.setOnAction(e -> controller.startBatchExport());
         exportBtn.setOnAction(e -> controller.exportDashboardCsv());
@@ -384,6 +396,7 @@ public class QTracePanel {
         // Row 3: counters
         HBox countersRow = new HBox(20);
         countersRow.setAlignment(Pos.CENTER_LEFT);
+        countersRow.setId("counters-row"); // looked up by the screenshot harness — see ScreenshotHarness
 
         stepCountLabel   = bigNumber("0");
         preExistingLabel = styledLabel("", TEXT_MUTED, FontWeight.NORMAL, 9);
@@ -392,11 +405,11 @@ public class QTracePanel {
         stepCountLabel.setTextFill(Color.web(BLUE));
         VBox stepsBox = new VBox(1, stepTitle, stepCountLabel, preExistingLabel);
         stepsBox.setAlignment(Pos.CENTER_LEFT);
+        stepsBox.setId("counter-steps"); // looked up by the screenshot harness — see ScreenshotHarness
 
-        countersRow.getChildren().addAll(
-            stepsBox,
-            buildCounter("Manual corrections", PEACH, corrCountLabel = bigNumber("0"))
-        );
+        VBox correctionsBox = buildCounter("Manual corrections", PEACH, corrCountLabel = bigNumber("0"));
+        correctionsBox.setId("counter-corrections"); // looked up by the screenshot harness — see ScreenshotHarness
+        countersRow.getChildren().addAll(stepsBox, correctionsBox);
 
         section.getChildren().addAll(statusRow, imageRow, countersRow);
         return section;
@@ -425,6 +438,7 @@ public class QTracePanel {
         Label title = styledLabel("Activity log", TEXT_MUTED, FontWeight.NORMAL, 10);
 
         logArea = new TextArea();
+        logArea.setId("activity-log"); // looked up by the screenshot harness — see ScreenshotHarness
         logArea.setEditable(false);
         logArea.setPrefHeight(90);
         VBox.setVgrow(logArea, Priority.ALWAYS);

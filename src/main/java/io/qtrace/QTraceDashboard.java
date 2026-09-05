@@ -257,6 +257,7 @@ public class QTraceDashboard {
         root.setStyle("-fx-background-color:" + BG_BASE + ";");
 
         filterToggleBtn = new Button("☰");
+        filterToggleBtn.setId("filter-view-button"); // looked up by the screenshot harness — see ScreenshotHarness
         filterToggleBtn.setFont(Font.font("System", 14));
         filterToggleBtn.setTextFill(Color.web(BLUE));
         filterToggleBtn.setTooltip(new Tooltip("Toggle filter panel"));
@@ -342,6 +343,7 @@ public class QTraceDashboard {
 
     private Button buildRefreshButton() {
         Button btn = styledBtn("Refresh", BLUE);
+        btn.setId("refresh-button"); // looked up by the screenshot harness — see ScreenshotHarness
         btn.setOnAction(e -> autoScan());
         return btn;
     }
@@ -389,6 +391,7 @@ public class QTraceDashboard {
 
     private HBox buildTableHeaderRow() {
         HBox header = new HBox(0);
+        header.setId("table-header"); // looked up by the screenshot harness — see ScreenshotHarness
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(0, 8, 0, 8));
         header.setStyle(
@@ -2584,8 +2587,12 @@ public class QTraceDashboard {
         card.setStyle("-fx-background-color:" + BG_SURFACE + ";"
             + "-fx-border-color:" + BORDER + ";"
             + "-fx-border-radius:6;-fx-background-radius:6;");
+        Label titleLbl = lbl(title, TEXT_MAIN, 12, FontWeight.BOLD, false);
+        // looked up by the screenshot harness (only the one currently annotated needs an id)
+        // — see ScreenshotHarness
+        if (title.contains("Image & Validation")) titleLbl.setId("card-image-validation-title");
         card.getChildren().addAll(
-            lbl(title, TEXT_MAIN, 12, FontWeight.BOLD, false),
+            titleLbl,
             sep(),
             content
         );
@@ -2719,6 +2726,7 @@ public class QTraceDashboard {
         HBox titleRow = new HBox(0,
             lbl("🔍  Filters", TEXT_MAIN, 12, FontWeight.BOLD, false),
             titleSp, closeBtn);
+        titleRow.setId("filters-header"); // looked up by the screenshot harness — see ScreenshotHarness
         titleRow.setPadding(new Insets(8, 8, 8, 12));
         titleRow.setAlignment(Pos.CENTER_LEFT);
         titleRow.setStyle("-fx-background-color:" + BG_CARD + ";");
