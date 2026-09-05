@@ -40,6 +40,55 @@ test {
     useJUnitPlatform()
 }
 
+// ── Screenshot harness (docs/user-guide/screenshots/*.png) ─────────────────
+// Separate source set — NOT part of `test`/`check`, so it never runs in the
+// pre-commit hook or CI. Needs a real display (X11) or `xvfb-run`; JavaFX
+// runs its normal (non-headless) toolkit, just against an offscreen window.
+// See docs/user-guide/screenshots/README.md.
+sourceSets {
+    screenshots {
+        java.srcDir 'src/screenshots/java'
+    }
+}
+
+configurations {
+    screenshotsImplementation.extendsFrom implementation
+    screenshotsRuntimeOnly.extendsFrom runtimeOnly
+}
+
+// Linux-only classifier — qtrace's own dev machine. macOS/Windows contributors
+// running this task should swap 'linux' for 'mac'/'mac-aarch64'/'win' below.
+ext.javafxRuntimeVersion = '21.0.2'
+ext.javafxPlatform = 'linux'
+
+dependencies {
+    screenshotsImplementation sourceSets.main.output
+    screenshotsImplementation "io.github.qupath:qupath-core:${qupathVersion}"
+    screenshotsImplementation "io.github.qupath:qupath-gui-fx:${qupathVersion}"
+    screenshotsImplementation 'com.google.code.gson:gson:2.10.1'
+    screenshotsImplementation 'org.mockito:mockito-core:5.14.2'
+    ['base', 'graphics', 'controls', 'fxml', 'swing'].each { mod ->
+        screenshotsImplementation "org.openjfx:javafx-${mod}:${javafxRuntimeVersion}:${javafxPlatform}"
+    }
+}
+
+tasks.register('screenshotsUI', JavaExec) {
+    group = 'documentation'
+    description = 'Regenerates docs/user-guide/screenshots/*.png automatically (no user interaction). ' +
+                   'Needs a display: run directly, or prefix with `xvfb-run -a` for a fully invisible run.'
+    classpath = sourceSets.screenshots.runtimeClasspath
+    mainClass = 'io.qtrace.screenshots.ScreenshotHarness'
+    // Isolated fake home — never touches the real ~/.qTrace/config.json or export dir.
+    systemProperty 'user.home', "${buildDir}/screenshot-home"
+    systemProperty 'qtrace.screenshots.outDir', "${rootDir}/../docs/user-guide/screenshots"
+    // Dashboard capture is opt-in (real local .qtrace data — contributor names, project
+    // names) — off unless a Gradle project property points at fixtures you've reviewed:
+    //   ./gradlew screenshotsUI -PdashboardFixtures=/path/to/reviewed/qtrace/files
+    if (project.hasProperty('dashboardFixtures')) {
+        systemProperty 'qtrace.screenshots.fixturesDir', project.property('dashboardFixtures')
+    }
+}
+
 jar {
     archiveBaseName = 'qtrace-core'
     manifest {
