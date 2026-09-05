@@ -97,18 +97,25 @@ public class QTraceCommitGraph {
         this.qupath = qupath;
         this.stage  = new Stage();
         stage.setTitle(QTraceI18n.t("graph.window.title"));
+        // setWidth()/setHeight() weren't honored on first show() no matter when they were
+        // called (window opened at JavaFX's 200×200 default) — only setMinWidth/setMinHeight
+        // reliably applied, so those carry the real target size instead.
+        stage.setMinWidth(1180);
+        stage.setMinHeight(460);
 
         headerLabel = new Label("");
         headerLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
         headerLabel.setTextFill(Color.web(TEXT_MAIN));
 
         Button openBtn = new Button(QTraceI18n.t("graph.open"));
+        openBtn.setId("graph-open-button"); // looked up by the screenshot harness — see ScreenshotHarness
         styleButton(openBtn);
         openBtn.setOnAction(e -> chooseFile());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox header = new HBox(10, headerLabel, spacer, openBtn);
+        header.setId("graph-header"); // looked up by the screenshot harness — see ScreenshotHarness
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(10, 14, 10, 14));
         header.setStyle("-fx-background-color: " + BG_CARD + ";");
@@ -117,10 +124,12 @@ public class QTraceCommitGraph {
         Pane canvasPane = new Pane(canvas);
         canvasPane.setStyle("-fx-background-color: " + BG_BASE + ";");
         ScrollPane scroll = new ScrollPane(canvasPane);
+        scroll.setId("graph-canvas"); // looked up by the screenshot harness — see ScreenshotHarness
         scroll.setStyle("-fx-background: " + BG_BASE + "; -fx-background-color: " + BG_BASE + ";");
         scroll.setFitToHeight(true);
 
         detailBox = new VBox(6);
+        detailBox.setId("graph-detail-panel"); // looked up by the screenshot harness — see ScreenshotHarness
         detailBox.setPadding(new Insets(12));
         detailBox.setPrefWidth(280);
         detailBox.setStyle("-fx-background-color: " + BG_SURFACE + ";"
@@ -156,6 +165,19 @@ public class QTraceCommitGraph {
     public boolean isIconified() { return stage.isIconified(); }
     public void    minimize()    { stage.setIconified(true); }
     public void    front()       { stage.show(); stage.toFront(); stage.setIconified(false); }
+
+    /**
+     * Selects and highlights the commit at {@code index} (0 = first/oldest), same effect
+     * as clicking its node on the canvas — populates the detail panel on the right. No-op
+     * if the index is out of range or nothing is loaded yet. Used by the screenshot harness
+     * so version-graph.png shows a populated detail panel instead of the empty placeholder.
+     */
+    public void selectNode(int index) {
+        if (index < 0 || index >= nodes.size()) return;
+        Node n = nodes.get(index);
+        showDetail(n);
+        redraw(n);
+    }
 
     // ── Loading ──────────────────────────────────────────────────────────────--
 
