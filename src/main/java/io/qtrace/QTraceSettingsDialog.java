@@ -71,6 +71,7 @@ public class QTraceSettingsDialog {
         TextField tfLogs        = pathField(cfg.rawLogsDir());
 
         GridPane grid = new GridPane();
+        grid.setId("settings-paths-grid"); // looked up by the screenshot harness — see ScreenshotHarness
         grid.setHgap(8);
         grid.setVgap(12);
         grid.setPadding(new Insets(20, 20, 12, 20));
@@ -121,6 +122,7 @@ public class QTraceSettingsDialog {
 
         // ── Validator section ──────────────────────────────────────────────────
         TextField tfValidator = new TextField(cfg.getValidatorName());
+        tfValidator.setId("settings-validator-field"); // looked up by the screenshot harness — see ScreenshotHarness
         tfValidator.setPromptText("e.g. Dr. Lastname  —  leave blank to enter each time");
         tfValidator.setPrefHeight(30);
         tfValidator.setStyle(
@@ -368,6 +370,7 @@ public class QTraceSettingsDialog {
         record NavEntry(String title, Node page, Label navLabel) {}
         java.util.List<NavEntry> entries = new java.util.ArrayList<>();
         VBox sidebar = new VBox();
+        sidebar.setId("settings-sidebar"); // looked up by the screenshot harness — see ScreenshotHarness
         sidebar.setPrefWidth(190);
         sidebar.setMinWidth(190);
         sidebar.setStyle("-fx-background-color: " + BG_SURFACE + ";");
@@ -382,11 +385,16 @@ public class QTraceSettingsDialog {
             {"Appearance",     pageAppearance},
             {"About qTrace",   pageAbout},
         };
+        // Looked up by the screenshot harness to click into a section without a real mouse —
+        // see ScreenshotHarness / tools/screenshots.
+        String[] sectionIds = {"identity", "licence", "paths", "preferences", "appearance", "about"};
 
-        for (Object[] s : sections) {
+        for (int i = 0; i < sections.length; i++) {
+            Object[] s = sections[i];
             String title = (String) s[0];
             Node page = (Node) s[1];
             Label navLabel = new Label(title);
+            navLabel.setId("settings-nav-" + sectionIds[i]);
             navLabel.setMaxWidth(Double.MAX_VALUE);
             navLabel.setFont(Font.font("System", 12));
             navLabel.setPadding(new Insets(10, 16, 10, 16));
