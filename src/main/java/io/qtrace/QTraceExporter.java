@@ -365,6 +365,13 @@ public class QTraceExporter {
         // Cell intensity classifications
         session.add("cell_intensity_classifications", buildCellIntensityArray());
 
+        // Measurement maps (Analyze/View > Measurement maps) — display-only, never scriptable:
+        // QuPath never pushes anything to the history workflow for this dialog, so this is
+        // provenance-only and is never part of the replay script (see MeasurementMapRecord).
+        JsonArray measurementMapsArr = buildMeasurementMapsArray();
+        session.add("measurement_maps", measurementMapsArr);
+        session.addProperty("measurement_maps_count", measurementMapsArr.size());
+
         // Annotations with per-author attribution
         session.add("annotations", buildAnnotationsObject(imageData, outputDir, imageName));
 
@@ -542,6 +549,27 @@ public class QTraceExporter {
             cio.addProperty("applied_at", cic.appliedAt.toString());
             cio.addProperty("applied_by", cic.appliedBy);
             arr.add(cio);
+        }
+        return arr;
+    }
+
+    /**
+     * Measurement maps (Analyze/View > Measurement maps) — display-only, never replayed.
+     * {@code scriptable} is always false: QuPath never pushes anything to the history
+     * workflow for this dialog (see MeasurementMapRecord), so a non-empty array here only
+     * ever surfaces as the "N measurement map view(s) not replayed" replay-script warning.
+     */
+    private JsonArray buildMeasurementMapsArray() {
+        JsonArray arr = new JsonArray();
+        for (MeasurementMapRecord mm : logger.getMeasurementMapRecords()) {
+            JsonObject mo = new JsonObject();
+            mo.addProperty("measurement",  mm.measurementName);
+            mo.addProperty("colormap",     mm.colormapName);
+            mo.addProperty("range_min",    mm.rangeMin);
+            mo.addProperty("range_max",    mm.rangeMax);
+            mo.addProperty("timestamp",    mm.timestamp.toString());
+            mo.addProperty("scriptable",   false);
+            arr.add(mo);
         }
         return arr;
     }

@@ -34,8 +34,11 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
@@ -49,6 +52,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.util.function.Consumer;
+import qupath.lib.color.ColorMaps;
 import qupath.lib.images.servers.AffineTransformImageServer;
 import java.awt.geom.AffineTransform;
 import qupath.lib.gui.QuPathGUI;
@@ -135,6 +139,14 @@ public class ActionLogger implements WorkflowListener {
     // Alignment provenance (v0.5.19 / v0.5.20) ──────────────────────────────
     private volatile AlignmentRecord currentAlignment       = null;
     private volatile Thread          alignmentWatcherThread = null;
+
+    // Measurement maps provenance ───────────────────────────────────────────
+    // "Measurement maps" (Analyze/View > Measurement maps) is a pure live-display action —
+    // QuPath never pushes anything to the history workflow for it — so, like Warpy alignment,
+    // it's watched by polling for its Stage rather than via the WorkflowListener mechanism.
+    private volatile Thread                    measurementMapWatcherThread = null;
+    private volatile boolean                   measurementMapHooked        = false;
+    private final List<MeasurementMapRecord>   measurementMapRecords       = new ArrayList<>();
 
     // Cell intensity classifications ─────────────────────────────────────────
     private final Map<String, CellIntensityRecord> cellIntensityRecords = new LinkedHashMap<>();
@@ -363,6 +375,7 @@ public class ActionLogger implements WorkflowListener {
         startWarpyFileWatcher();
         snapshotAlignment();
         startAlignmentWatcher();
+        startMeasurementMapWatcher();
 
         refreshManualAnnotationCount();
         if (panel != null) panel.setRecordingActive(true);
@@ -381,6 +394,9 @@ public class ActionLogger implements WorkflowListener {
         stopWarpyFileWatcher();
         unhookWarpyPane();
         currentAlignment = null;
+        stopMeasurementMapWatcher();
+        measurementMapHooked = false;
+        measurementMapRecords.clear();
         stopClassifierWatcher();
         stopObjectClassifierWatcher();
         knownClassifiers.clear();
@@ -1186,6 +1202,151 @@ public class ActionLogger implements WorkflowListener {
     }
 
     public AlignmentRecord getAlignmentRecord() { return currentAlignment; }
+
+    // ── Measurement maps hook ────────────────────────────────────────────────
+    // "Measurement maps" (Analyze/View > Measurement maps, Commands.createMeasurementMapDialog)
+    // is a pure live-display action — QuPath never pushes anything to the history workflow for
+    // it, so like Warpy alignment above, it's watched by polling for its Stage rather than via
+    // the WorkflowListener mechanism. Never part of the replay script — provenance only.
+
+    private volatile ListView<String>             measurementMapListView  = null;
+    private volatile ComboBox<ColorMaps.ColorMap> measurementMapComboBox  = null;
+    private final List<Slider>                    measurementMapSliders  = new ArrayList<>();
+
+    public List<MeasurementMapRecord> getMeasurementMapRecords() {
+        return Collections.unmodifiableList(measurementMapRecords);
+    }
+
+    private void startMeasurementMapWatcher() {
+        if (measurementMapWatcherThread != null && measurementMapWatcherThread.isAlive()) return;
+        measurementMapWatcherThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Thread.sleep(500);
+                    Platform.runLater(this::scanForMeasurementMapWindow);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }, "qtrace-measurementmap-watcher");
+        measurementMapWatcherThread.setDaemon(true);
+        measurementMapWatcherThread.start();
+    }
+
+    private void stopMeasurementMapWatcher() {
+        if (measurementMapWatcherThread != null) {
+            measurementMapWatcherThread.interrupt();
+            measurementMapWatcherThread = null;
+        }
+    }
+
+    /**
+     * Scans open JavaFX windows for QuPath's built-in "Measurement maps" dialog
+     * (Commands.createMeasurementMapDialog) and locates its controls by scene-graph
+     * traversal — MeasurementMapPane's fields (listMeasurements, sliderMin, sliderMax,
+     * comboMapper) are private and not part of qTrace's own API, so this deliberately walks
+     * the JavaFX Node tree by control type instead of importing that class. Teardown mirrors
+     * the Warpy hook above: poll-based, driven by Stage.isShowing() rather than setOnHidden.
+     * Wrapped defensively — if QuPath's internals ever change shape, this must never crash
+     * the extension, only skip the capture.
+     */
+    private void scanForMeasurementMapWindow() {
+        try {
+            if (!measurementMapHooked) {
+                for (var window : Window.getWindows()) {
+                    if (!(window instanceof Stage stage)) continue;
+                    if (!"Measurement maps".equals(stage.getTitle()) || !stage.isShowing()) continue;
+                    if (stage.getScene() == null) continue;
+
+                    measurementMapListView = findListView(stage.getScene().getRoot());
+                    measurementMapComboBox = findColorMapCombo(stage.getScene().getRoot());
+                    measurementMapSliders.clear();
+                    findSliders(stage.getScene().getRoot(), measurementMapSliders);
+
+                    if (measurementMapListView != null) {
+                        measurementMapHooked = true;
+                        if (panel != null) panel.log("[MeasurementMap] Dialog detected — watching for selection.");
+                    }
+                    return;
+                }
+            } else {
+                boolean stillOpen = Window.getWindows().stream()
+                    .filter(w -> w instanceof Stage)
+                    .map(w -> (Stage) w)
+                    .anyMatch(s -> s.isShowing() && "Measurement maps".equals(s.getTitle()));
+                if (!stillOpen) {
+                    snapshotMeasurementMapState("Dialog closed");
+                    measurementMapListView = null;
+                    measurementMapComboBox = null;
+                    measurementMapSliders.clear();
+                    measurementMapHooked = false;
+                }
+            }
+        } catch (Exception e) {
+            if (panel != null) panel.log("[MeasurementMap] WARNING: watcher error — " + e.getMessage());
+            measurementMapHooked = false;
+        }
+    }
+
+    /** Recursively searches a scene node for the first ListView (the measurement name list). */
+    @SuppressWarnings("unchecked")
+    private ListView<String> findListView(Node node) {
+        if (node instanceof ListView<?> lv) return (ListView<String>) lv;
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                ListView<String> found = findListView(child);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    /** Recursively searches a scene node for the first ComboBox (the colormap picker). */
+    @SuppressWarnings("unchecked")
+    private ComboBox<ColorMaps.ColorMap> findColorMapCombo(Node node) {
+        if (node instanceof ComboBox<?> cb) return (ComboBox<ColorMaps.ColorMap>) cb;
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                ComboBox<ColorMaps.ColorMap> found = findColorMapCombo(child);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Collects every Slider in the scene, in traversal (declaration/layout) order.
+     * MeasurementMapPane declares and lays out sliderMin before sliderMax, so by convention
+     * here: first Slider found = min, second = max. Risk: if a future QuPath version reorders
+     * them in the pane, this silently swaps min/max — there is no other way to identify them
+     * since they aren't exposed by any public API.
+     */
+    private void findSliders(Node node, List<Slider> out) {
+        if (node instanceof Slider s) out.add(s);
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable())
+                findSliders(child, out);
+        }
+    }
+
+    /** Snapshots the dialog's current selection into a MeasurementMapRecord, unless nothing was ever selected. */
+    private void snapshotMeasurementMapState(String reason) {
+        try {
+            if (measurementMapListView == null) return;
+            String measurement = measurementMapListView.getSelectionModel().getSelectedItem();
+            if (measurement == null || measurement.isBlank()) return; // opened but nothing chosen
+            String colormap = "(unknown)";
+            if (measurementMapComboBox != null && measurementMapComboBox.getValue() != null)
+                colormap = measurementMapComboBox.getValue().getName();
+            double min = measurementMapSliders.size() > 0 ? measurementMapSliders.get(0).getValue() : Double.NaN;
+            double max = measurementMapSliders.size() > 1 ? measurementMapSliders.get(1).getValue() : Double.NaN;
+            measurementMapRecords.add(new MeasurementMapRecord(measurement, colormap, min, max, Instant.now()));
+            if (panel != null) panel.log("[MeasurementMap] " + reason + " — measurement: " + measurement
+                + ", colormap: " + colormap + ", range: [" + min + ", " + max + "]");
+        } catch (Exception e) {
+            if (panel != null) panel.log("[MeasurementMap] WARNING: could not capture state — " + e.getMessage());
+        }
+    }
 
     // ── Warpy button hook (v0.5.21) ───────────────────────────────────────────
 
