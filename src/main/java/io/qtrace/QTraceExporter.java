@@ -372,6 +372,12 @@ public class QTraceExporter {
         session.add("measurement_maps", measurementMapsArr);
         session.addProperty("measurement_maps_count", measurementMapsArr.size());
 
+        // Brightness & contrast (View > Brightness/contrast) — scriptable, replayed as real
+        // steps by QTraceReplayEngine (see DisplaySettingsRecord).
+        JsonArray displaySettingsArr = buildDisplaySettingsArray();
+        session.add("display_settings", displaySettingsArr);
+        session.addProperty("display_settings_count", displaySettingsArr.size());
+
         // Annotations with per-author attribution
         session.add("annotations", buildAnnotationsObject(imageData, outputDir, imageName));
 
@@ -570,6 +576,37 @@ public class QTraceExporter {
             mo.addProperty("timestamp",    mm.timestamp.toString());
             mo.addProperty("scriptable",   false);
             arr.add(mo);
+        }
+        return arr;
+    }
+
+    /**
+     * Brightness & contrast (View > Brightness/contrast) — {@code scriptable} is always true,
+     * unlike measurement maps: every field has a public ImageDisplay/QuPathViewer scripting
+     * equivalent (see DisplaySettingsRecord's javadoc), so QTraceReplayEngine generates a real
+     * executable step from each entry instead of a display-only warning row.
+     */
+    private JsonArray buildDisplaySettingsArray() {
+        JsonArray arr = new JsonArray();
+        for (DisplaySettingsRecord ds : logger.getDisplaySettingsRecords()) {
+            JsonObject dso = new JsonObject();
+            JsonArray channelsArr = new JsonArray();
+            for (DisplaySettingsRecord.ChannelSetting ch : ds.channels) {
+                JsonObject co = new JsonObject();
+                co.addProperty("name",     ch.name());
+                if (ch.colorRgb() != null) co.addProperty("color_rgb", ch.colorRgb());
+                co.addProperty("min",      ch.minDisplay());
+                co.addProperty("max",      ch.maxDisplay());
+                co.addProperty("selected", ch.selected());
+                channelsArr.add(co);
+            }
+            dso.add("channels", channelsArr);
+            dso.addProperty("gamma",             ds.gamma);
+            dso.addProperty("grayscale",         ds.grayscale);
+            dso.addProperty("invert_background", ds.invertBackground);
+            dso.addProperty("timestamp",         ds.timestamp.toString());
+            dso.addProperty("scriptable",        true);
+            arr.add(dso);
         }
         return arr;
     }

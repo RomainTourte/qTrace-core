@@ -148,6 +148,16 @@ public class ActionLogger implements WorkflowListener {
     private volatile boolean                   measurementMapHooked        = false;
     private final List<MeasurementMapRecord>   measurementMapRecords       = new ArrayList<>();
 
+    // Display settings provenance ────────────────────────────────────────────
+    // "Brightness & contrast" (View > Brightness/contrast) is also a pure live-display
+    // action with no workflow entry — watched the same way as Measurement maps — but unlike
+    // it, every field here has a public ImageDisplay/QuPathViewer scripting equivalent, so
+    // QTraceReplayEngine turns each captured record into a real replay step (see
+    // DisplaySettingsRecord's javadoc).
+    private volatile Thread                    displaySettingsWatcherThread = null;
+    private volatile boolean                   displaySettingsHooked        = false;
+    private final List<DisplaySettingsRecord>  displaySettingsRecords       = new ArrayList<>();
+
     // Cell intensity classifications ─────────────────────────────────────────
     private final Map<String, CellIntensityRecord> cellIntensityRecords = new LinkedHashMap<>();
 
@@ -376,6 +386,7 @@ public class ActionLogger implements WorkflowListener {
         snapshotAlignment();
         startAlignmentWatcher();
         startMeasurementMapWatcher();
+        startDisplaySettingsWatcher();
 
         refreshManualAnnotationCount();
         if (panel != null) panel.setRecordingActive(true);
@@ -397,6 +408,9 @@ public class ActionLogger implements WorkflowListener {
         stopMeasurementMapWatcher();
         measurementMapHooked = false;
         measurementMapRecords.clear();
+        stopDisplaySettingsWatcher();
+        displaySettingsHooked = false;
+        displaySettingsRecords.clear();
         stopClassifierWatcher();
         stopObjectClassifierWatcher();
         knownClassifiers.clear();
@@ -1345,6 +1359,91 @@ public class ActionLogger implements WorkflowListener {
                 + ", colormap: " + colormap + ", range: [" + min + ", " + max + "]");
         } catch (Exception e) {
             if (panel != null) panel.log("[MeasurementMap] WARNING: could not capture state — " + e.getMessage());
+        }
+    }
+
+    // ── Brightness & contrast hook ───────────────────────────────────────────
+    // Unlike Measurement maps, ImageDisplay is a proper public API object already holding
+    // the live state (channels, min/max, colors, gamma) — no scene-graph scraping needed.
+    // Only the dialog's Stage is polled, purely to know *when* to take the snapshot (on close).
+
+    public List<DisplaySettingsRecord> getDisplaySettingsRecords() {
+        return Collections.unmodifiableList(displaySettingsRecords);
+    }
+
+    private void startDisplaySettingsWatcher() {
+        if (displaySettingsWatcherThread != null && displaySettingsWatcherThread.isAlive()) return;
+        displaySettingsWatcherThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Thread.sleep(500);
+                    Platform.runLater(this::scanForDisplaySettingsWindow);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }, "qtrace-displaysettings-watcher");
+        displaySettingsWatcherThread.setDaemon(true);
+        displaySettingsWatcherThread.start();
+    }
+
+    private void stopDisplaySettingsWatcher() {
+        if (displaySettingsWatcherThread != null) {
+            displaySettingsWatcherThread.interrupt();
+            displaySettingsWatcherThread = null;
+        }
+    }
+
+    /** Polls for QuPath's built-in "Brightness & contrast" dialog Stage; snapshots {@link #snapshotDisplaySettingsState} on close. */
+    private void scanForDisplaySettingsWindow() {
+        try {
+            boolean stillOpen = Window.getWindows().stream()
+                .filter(w -> w instanceof Stage)
+                .map(w -> (Stage) w)
+                .anyMatch(s -> s.isShowing() && isDisplaySettingsTitle(s.getTitle()));
+            if (stillOpen) {
+                displaySettingsHooked = true;
+            } else if (displaySettingsHooked) {
+                snapshotDisplaySettingsState("Dialog closed");
+                displaySettingsHooked = false;
+            }
+        } catch (Exception e) {
+            if (panel != null) panel.log("[DisplaySettings] WARNING: watcher error — " + e.getMessage());
+            displaySettingsHooked = false;
+        }
+    }
+
+    private static boolean isDisplaySettingsTitle(String title) {
+        if (title == null) return false;
+        String t = title.toLowerCase();
+        return t.contains("brightness") && t.contains("contrast");
+    }
+
+    /** Reads the current viewer's live {@code ImageDisplay} state and records a snapshot. */
+    private void snapshotDisplaySettingsState(String reason) {
+        try {
+            var viewer = qupath.getViewer();
+            if (viewer == null) return;
+            var display = viewer.getImageDisplay();
+            if (display == null) return;
+
+            List<DisplaySettingsRecord.ChannelSetting> channels = new ArrayList<>();
+            var selected = display.selectedChannels();
+            for (var ci : display.availableChannels()) {
+                channels.add(new DisplaySettingsRecord.ChannelSetting(
+                    ci.getName(), ci.getColor(), ci.getMinDisplay(), ci.getMaxDisplay(),
+                    selected.contains(ci)));
+            }
+            if (channels.isEmpty()) return; // dialog opened but no channels available (e.g. no image)
+
+            double gamma = viewer.getGamma();
+            DisplaySettingsRecord record = new DisplaySettingsRecord(
+                channels, gamma, display.useGrayscaleLuts(), display.useInvertedBackground(), Instant.now());
+            displaySettingsRecords.add(record);
+            if (panel != null) panel.log("[DisplaySettings] " + reason + " — " + channels.size()
+                + " channel(s), gamma " + gamma);
+        } catch (Exception e) {
+            if (panel != null) panel.log("[DisplaySettings] WARNING: could not capture state — " + e.getMessage());
         }
     }
 
