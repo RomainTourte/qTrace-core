@@ -1,3 +1,14 @@
+## What's new in v1.1.5
+
+### Added — Brightness & contrast capture, replayed as a real step in the Player
+QuPath never records anything in the workflow history for the Brightness & contrast dialog, so a replayed analysis could reproduce every detection and measurement yet look completely different on screen. qTrace now watches that dialog and snapshots the live per-channel min/max, color, visibility, gamma, grayscale and invert-background state when it closes. Each snapshot becomes a real, executable **Display settings** step in the Replay Player's Instructions list (checkbox, status, timer — same as any other step) and in the exported MetaScript, so a figure's exact visual appearance is reproducible, not just the underlying pixel data.
+
+### Fixed — InstanSeg replay silently substituting a mismatched model version
+A locally-installed but differently-versioned InstanSeg model (e.g. 0.1.1 when the capture used 0.1.0) was silently treated as satisfying the pre-flight check, and the replay ran with the wrong weights with no warning — producing results that diverge from the original run. Exact-version match is now tried first; a base-name fallback still runs at replay time but logs an explicit WARNING, and pre-flight no longer reports a differently-versioned model as present.
+
+### Added — Select all button in the Player's Target image(s) panel
+Checking every project image one-by-one before a batch replay was tedious — a single button now marks every target as checked in one click.
+
 ## What's new in v1.1.4
 
 ### Changed — Settings redesigned as a two-pane sidebar
