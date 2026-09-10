@@ -276,6 +276,7 @@ public class QTraceDashboard {
             QTracePanel.logoView(28),
             lbl("📊 QTrace Dashboard", TEXT_MAIN, 15, FontWeight.BOLD, false),
             sp,
+            buildExportButton(),
             filterToggleBtn,
             buildRefreshButton()
         );
@@ -345,6 +346,14 @@ public class QTraceDashboard {
         Button btn = styledBtn("Refresh", BLUE);
         btn.setId("refresh-button"); // looked up by the screenshot harness — see ScreenshotHarness
         btn.setOnAction(e -> autoScan());
+        return btn;
+    }
+
+    private Button buildExportButton() {
+        Button btn = styledBtn(QTraceI18n.t("btn.export.caption"), GREEN);
+        btn.setId("export-button"); // looked up by the screenshot harness — see ScreenshotHarness
+        btn.setTooltip(new Tooltip(QTraceI18n.t("btn.export.tooltip")));
+        btn.setOnAction(e -> runCsvExport(qupath));
         return btn;
     }
 
