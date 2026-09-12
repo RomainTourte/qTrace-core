@@ -92,13 +92,18 @@ public class QTraceExtension implements QuPathExtension, GitHubProject {
         MenuItem dashboard   = new MenuItem("Dashboard");
         dashboard.setOnAction(e -> controller.showDashboard());
 
+        // Compliance-only (no-ops via openReplayDialog() when not entitled — same
+        // safety net as the panel's Replay button, see QTracePanel.java:296).
+        MenuItem player      = new MenuItem("Player");
+        player.setOnAction(e -> controller.openReplayDialog());
+
         MenuItem preferences = new MenuItem("Preferences...");
         preferences.setOnAction(e -> controller.showPreferences());
 
         MenuItem about       = new MenuItem("About QTrace...");
         about.setOnAction(e -> controller.showAbout());
 
-        menu.getItems().addAll(openPanel, dashboard, new SeparatorMenuItem(), preferences, about);
+        menu.getItems().addAll(openPanel, dashboard, player, new SeparatorMenuItem(), preferences, about);
 
         // ── Toolbar button (added on FX thread after QuPath finishes layout) ───
         Platform.runLater(() -> addToolbarButton(qupath));
@@ -152,13 +157,18 @@ public class QTraceExtension implements QuPathExtension, GitHubProject {
         MenuItem miDash   = new MenuItem("Dashboard");
         miDash.setOnAction(e -> controller.showDashboard());
 
+        // Compliance-only (no-ops via openReplayDialog() when not entitled — same
+        // safety net as the panel's Replay button, see QTracePanel.java:296).
+        MenuItem miPlayer = new MenuItem("Player");
+        miPlayer.setOnAction(e -> controller.openReplayDialog());
+
         MenuItem miPrefs  = new MenuItem("Preferences...");
         miPrefs.setOnAction(e -> controller.showPreferences());
 
         MenuItem miAbout  = new MenuItem("About qTrace...");
         miAbout.setOnAction(e -> controller.showAbout());
 
-        btn.getItems().addAll(miPanel, miDash, new SeparatorMenuItem(), miPrefs, miAbout);
+        btn.getItems().addAll(miPanel, miDash, miPlayer, new SeparatorMenuItem(), miPrefs, miAbout);
 
         // ── Dynamic icon colour based on recording state ───────────────────────
         controller.addRecordingListener(recording ->
