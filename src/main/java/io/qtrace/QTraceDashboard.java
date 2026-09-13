@@ -666,6 +666,34 @@ public class QTraceDashboard {
                     if (str(d, "class",       "").toLowerCase().contains(query)) return true;
                 }
             }
+
+            // Extensions used (e.g. "InstanSeg", "StarDist") — see collectRecordedExtensions.
+            if (s.has("extensions") && s.get("extensions").isJsonArray()) {
+                for (var item : s.getAsJsonArray("extensions")) {
+                    if (!item.isJsonObject()) continue;
+                    if (str(item.getAsJsonObject(), "name", "").toLowerCase().contains(query)) return true;
+                }
+            }
+
+            // Captured steps — command name, replay script text, and any parameter value
+            // (classifier names like "ANN-FR-DefFeat_8TR_v1" typically live here, not in
+            // annotations[]). Covers e.g. searching "InstanSeg" for a step whose command
+            // is "Run InstanSeg model" or whose script_fragment calls InstanSeg.builder().
+            if (s.has("steps") && s.get("steps").isJsonArray()) {
+                for (var item : s.getAsJsonArray("steps")) {
+                    if (!item.isJsonObject()) continue;
+                    JsonObject st = item.getAsJsonObject();
+                    if (str(st, "command",        "").toLowerCase().contains(query)) return true;
+                    if (str(st, "script_fragment","").toLowerCase().contains(query)) return true;
+                    JsonObject params = jsonObj(st, "parameters");
+                    if (params != null) {
+                        for (var paramEntry : params.entrySet()) {
+                            if (!paramEntry.getValue().isJsonPrimitive()) continue;
+                            if (paramEntry.getValue().getAsString().toLowerCase().contains(query)) return true;
+                        }
+                    }
+                }
+            }
         }
         return false;
     }
